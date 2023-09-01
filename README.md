@@ -49,7 +49,7 @@ Simply run the script with the desired option
 sos4ocp [-p <SOSREPORT_PATH>] -n <PODNAME>
 ```
 
-or 
+or
 
 ```bash
 sos4ocp [-p <SOSREPORT_PATH>] -i <PODID>

@@ -79,6 +79,7 @@ do
     echo "[$[NUM+1]] - $(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
   done
+  echo "[q] - Quit"
   printf "Choice: "
   read REP
   if ([[ ${REP} != [qQ] ]] && [[ ${REP} != [0-9]* ]]) || ([[ ${REP} == [0-9]* ]] && ([[ ${REP} -gt ${OPTION_NUM} ]] || [[ ${REP} -le 0 ]]))
