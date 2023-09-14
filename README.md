@@ -46,13 +46,7 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 Simply run the script with the desired option
 
 ```bash
-sos4ocp [-p <SOSREPORT_PATH>] -n <PODNAME>
-```
-
-or
-
-```bash
-sos4ocp [-p <SOSREPORT_PATH>] -i <PODID>
+sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>] [-h]
 ```
 
 If you provide the full PODID, the script will trunk it to 13 characters.
@@ -62,16 +56,17 @@ If you provide the full PODID, the script will trunk it to 13 characters.
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -n <PODNAME>|-i <PODID> [-h]
-|--------------------------------------------------------------------------------------------------|
-| Options | Description                                                     | [Default]            |
-|---------|-----------------------------------------------------------------|----------------------|
-|      -s | Path to access the SOSREPORT base folder                        | <Current folder> [.] |
-|      -n | Name of the POD (required if POD ID is missing)                 | null                 |
-|      -i | UID of the POD (required if POD name is missing)                | null                 |
-|---------|-----------------------------------------------------------------|----------------------|
-|         | Additional Options:                                             |                      |
-|---------|-----------------------------------------------------------------|----------------------|
-|      -h | display this help and check for updated version                 |                      |
-|--------------------------------------------------------------------------------------------------|
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>] [-h]
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Options | Description                                                     | [Default]                                                                     |
+|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
+|      -s | Path to access the SOSREPORT base folder                        | <Current folder> [.]                                                          |
+|      -n | Name of the POD                                                 | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
+|      -i | UID of the POD                                                  | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
+|      -c | Name of a CONTAINER                                             | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
+|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
+|         | Additional Options:                                             |                                                                               |
+|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
+|      -h | display this help and check for updated version                 |                                                                               |
+|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 ```
