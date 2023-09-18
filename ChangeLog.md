@@ -12,6 +12,19 @@
 
 --------
 
+## Version 0.2.1
+
+### Minor updates - 0.2.1
+
+- None
+
+### Release updates - 0.2.1
+
+- Update 'awk' filter based on different crictl_ps_-a output when retreiving the POD list from a container name. 
+- Add the version number in the help message
+
+--------
+
 ## Version 0.2.0
 
 ### Minor updates - 0.2.0
