@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 0.2.0
+# @VERSION     # 0.2.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -32,6 +32,14 @@ fct_help(){
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|${purpletext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "-h" "display this help and check for updated version" ""
   printf "|%${OPTION_TAB}s---%-${DESCR_TAB}s---%-${DEFAULT_TAB}s|\n" |tr \  '-'
+
+  Script=$(which $0 2>${STD_ERR})
+  if [[ "${Script}" != "bash" ]] && [[ ! -z ${Script} ]]
+  then
+    VERSION=$(grep "@VERSION" ${Script} 2>${STD_ERR} | grep -Ev "VERSION=" | cut -d'#' -f3)
+    VERSION=${VERSION:-" N/A"}
+  fi
+  echo -e "\nCurrent Version:\t${VERSION}"
 }
 
 fct_title() {
@@ -195,7 +203,7 @@ then
 else
   if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]] && [[ "${CONTAINERNAME}" != "null" ]]
   then
-    POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a))
+    POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a))
     if [[ ${#POD_IDS_LIST[@]} == 1 ]]
     then
       PODID=${POD_IDS_LIST[0]}
