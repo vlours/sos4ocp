@@ -56,7 +56,7 @@ If you provide the full PODID, the script will trunk it to 13 characters.
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>] [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-g <CGROUP>] [-h]
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Options | Description                                                     | [Default]                                                                     |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
@@ -64,11 +64,12 @@ usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_N
 |      -n | Name of the POD                                                 | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
 |      -i | UID of the POD                                                  | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
 |      -c | Name of a CONTAINER                                             | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
+|      -g | Specific cgroup                                                 | null                                                                          |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
 |         | Additional Options:                                             |                                                                               |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
 |      -h | display this help and check for updated version                 |                                                                               |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 
-Current Version:	 X.X.X
+Current Version: X.X.X
 ```

@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 0.2.1
+# @VERSION     # 0.3.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -16,7 +16,7 @@ fct_help(){
   then
     ScriptName=$(basename $0)
   fi
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>] ${purpletext}[-h]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-g <CGROUP>] ${purpletext}[-h]${resetcolor}"
   OPTION_TAB=8
   DESCR_TAB=63
   DEFAULT_TAB=78
@@ -27,6 +27,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "Name of the POD" "null (if POD/CONTAINER options are missing, provide choice between all PODs)"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-i" "UID of the POD" "null (if POD/CONTAINER options are missing, provide choice between all PODs)"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-c" "Name of a CONTAINER" "null (if POD/CONTAINER options are missing, provide choice between all PODs)"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "Specific cgroup" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
@@ -42,10 +43,10 @@ fct_help(){
   echo -e "\nCurrent Version:\t${VERSION}"
 }
 
+# Titles
 fct_title() {
   echo -e "\n====== $* ======"
 }
-
 fct_title_details() {
   echo -e "\n##### $* #####"
 }
@@ -71,7 +72,7 @@ fct_container_log(){
   ${FCT_CMD}
 }
 
-# Display the Menu
+# Display the Main Menu
 fct_display_menu(){
 clear
 REP=""
@@ -106,7 +107,7 @@ do
 done
 }
 
-# Display the list Menu
+# Display the POD list Menu
 fct_pod_list_menu(){
 REP=""
 POD_NUM=$(echo ${#POD_LIST[@]})
@@ -148,16 +149,24 @@ then
     echo -e "Invalid option: ${1}\n"
     fct_help && exit 1
   fi
-  while getopts :i:n:c:s:h arg; do
+  OPTNUM=0
+  while getopts :i:n:c:s:g:h arg; do
   case $arg in
       i)
         PODID=${OPTARG}
+        OPTNUM=$[OPTNUM + 1]
         ;;
       n)
         PODNAME=${OPTARG}
+        OPTNUM=$[OPTNUM + 1]
         ;;
       c)
         CONTAINERNAME=${OPTARG}
+        OPTNUM=$[OPTNUM + 1]
+        ;;
+      g)
+        CGROUP=${OPTARG}
+        OPTNUM=$[OPTNUM + 1]
         ;;
       s)
         SOSREPORT_PATH=$(echo ${OPTARG} | sed -e "s/\/*$//")
@@ -166,66 +175,78 @@ then
         fct_help && exit 0
         ;;
       ?)
-        echo -e "Invalid option: ${1}\n"
+        echo -e "Invalid option\n"
         fct_help && exit 1
         ;;
   esac
   done
 fi
-
+if [[ ${OPTNUM} -ge 2 ]]
+then
+  echo -e "Too many arguments!\n"
+  fct_help && exit 3
+fi
 SOSREPORT_PATH=${SOSREPORT_PATH:-.}
 CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
 PODNAME=${PODNAME:-"null"}
 PODID=${PODID:-"null"}
 CONTAINERNAME=${CONTAINERNAME:-"null"}
-# Trunking the PODID to 13 characters
-PODID=$(echo ${PODID}  | cut -c1-13)
+CGROUP=${CGROUP:-"null"}
 
 # Check if the PATH is valid
 if [[ ! -d ${CRIO_PATH} ]]
 then
 
-  if [[ -d "$(ls -1d ${SOSREPORT_PATH}/*sosreport* | head -1)/sos_commands/crio" ]]
+  if [[ -d "$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)/sos_commands/crio" ]]
   then
-    CRIO_PATH="$(ls -1d ${SOSREPORT_PATH}/*sosreport* | head -1)/sos_commands/crio"
+    CRIO_PATH="$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)/sos_commands/crio"
   else
-    echo "Warn: Unable to find the crio folder in the SOSREPORT PATH."
-    echo "Err: Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
+    echo "Err: Unable to find the crio folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
     fct_help && exit 5
   fi
 fi
 
 clear
-if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]] && [[ "${CONTAINERNAME}" == "null" ]]
+
+if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]] && [[ "${CONTAINERNAME}" == "null" ]] && [[ "${CGROUP}" == "null" ]]
 then
   POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s ",$1,$(NF-3),$(NF-2)}}' ${CRIO_PATH}/crictl_pods))
   fct_pod_list_menu
 else
-  if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]] && [[ "${CONTAINERNAME}" != "null" ]]
+  if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]]
   then
-    POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a))
+    if [[ "${CONTAINERNAME}" != "null" ]]
+    then
+      POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a))
+      echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
+    else
+      if [[ "${CGROUP}" != "null" ]]
+      then
+        POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '. | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' ${CRIO_PATH}/pods/crictl_inspectp_*))
+        echo -e "List of PODs including the cgroup: ${CGROUP}\n"
+      fi
+    fi
     if [[ ${#POD_IDS_LIST[@]} == 1 ]]
     then
       PODID=${POD_IDS_LIST[0]}
     else
-      if [[ ${#POD_IDS_LIST[@]} == 0 ]]
+      if [[ ${#POD_IDS_LIST[@]} -ge 2 ]]
       then
-        POD_LIST=($(awk '{if($1 != "POD"){printf "%s,%s,%s ",$1,$(NF-3),$(NF-2)}}' ${CRIO_PATH}/crictl_pods))
-        fct_pod_list_menu
-      else
         POD_LIST=($(awk -v pod_ids="$(echo "${POD_IDS_LIST[@]}")" 'BEGIN{split(pod_ids,pod_array," ")}{for(ID in pod_array){if($1 == pod_array[ID]){printf "%s,%s,%s ",$1,$(NF-3),$(NF-2)}}}' ${CRIO_PATH}/crictl_pods))
-        echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         fct_pod_list_menu
       fi
     fi
   fi
 fi
 
+# Trunking the PODID to 13 characters
+PODID=$(echo ${PODID}  | cut -c1-13)
+
 # Collect the POD Details & set the missing value
 POD_DETAILS=$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods | sed -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
 if [[ -z "${POD_DETAILS}" ]]
 then
-  echo -e "Unable to find the POD/CONTAINER used as parameter\n" && fct_help && exit 10
+  echo -e "Unable to find a POD from the specified parameter\n" && fct_help && exit 10
 fi
 if [[ ${PODID} == "null" ]]
 then
