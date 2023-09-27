@@ -12,6 +12,21 @@
 
 --------
 
+## Version 0.3.0
+
+### Minor updates - 0.3.0
+
+- (Main) Adding the option '-g', allowing pod/container review from a specific cgroup as requested in RFE #5
+
+### Release updates - 0.3.0
+
+- (Help) Reduce space when displaying the current version
+- (Main) Enforcing the number of parameters.
+- (Main) Redirecting some command error message to the output set in variable ${STD_ERR}
+- (Various) Rewriting few messages and comments.
+
+--------
+
 ## Version 0.2.1
 
 ### Minor updates - 0.2.1
@@ -20,7 +35,7 @@
 
 ### Release updates - 0.2.1
 
-- Update 'awk' filter based on different crictl_ps_-a output when retreiving the POD list from a container name. 
+- Update 'awk' filter based on different crictl_ps_-a output when retreiving the POD list from a container name.
 - Add the version number in the help message
 
 --------
