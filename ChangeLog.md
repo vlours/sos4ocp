@@ -12,6 +12,20 @@
 
 --------
 
+## Version 0.4.0
+
+### Minor updates - 0.4.0
+
+- (Main) Replacing the option '-n', by '-p' when querying for a POD name.
+- (Main) Adding the option '-n', allowing pod/container review from a specific namespace as requested in RFE #7
+
+### Release updates - 0.4.0
+
+- (Main) Fixing issue with duplicate entries when the same container is listed twice in the same POD (exitec & running)
+- (Main) Simplifying the parameter management, using a 'PODFILTER' variable and a 'case' statement validation.
+
+--------
+
 ## Version 0.3.0
 
 ### Minor updates - 0.3.0

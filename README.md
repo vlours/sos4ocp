@@ -56,15 +56,19 @@ If you provide the full PODID, the script will trunk it to 13 characters.
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-n <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-g <CGROUP>] [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>] [-h]
+
+if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
+
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Options | Description                                                     | [Default]                                                                     |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
 |      -s | Path to access the SOSREPORT base folder                        | <Current folder> [.]                                                          |
-|      -n | Name of the POD                                                 | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
-|      -i | UID of the POD                                                  | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
-|      -c | Name of a CONTAINER                                             | null (if POD/CONTAINER options are missing, provide choice between all PODs)  |
-|      -g | Specific cgroup                                                 | null                                                                          |
+|      -p | Name of the POD                                                 | null                                                                          |
+|      -i | UID of the POD                                                  | null                                                                          |
+|      -c | Name of a CONTAINER                                             | null                                                                          |
+|      -n | NAMESPACE related to PODs                                       | null                                                                          |
+|      -g | CGROUP attached to a POD                                        | null                                                                          |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
 |         | Additional Options:                                             |                                                                               |
 |---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
