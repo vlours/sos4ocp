@@ -12,6 +12,19 @@
 
 --------
 
+## Version 0.4.1
+
+### Minor updates - 0.4.1
+
+- None
+
+### Release updates - 0.4.1
+
+- (README) Fix a typo
+- (Main) Ensure the inspect files are 'JSON DATA' when searching for the cgroup, avoiding filtering failure (Issue #9 point 2.)
+
+--------
+
 ## Version 0.4.0
 
 ### Minor updates - 0.4.0
