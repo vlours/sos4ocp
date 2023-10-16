@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 0.4.0
+# @VERSION     # 0.4.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
