@@ -1,6 +1,6 @@
 # sos4ocp
 
-This bash script will display PDO and containers details for a specific POD within a SOSREPORT
+This bash script will display POD and containers details for a specific POD within a SOSREPORT
 
 ## Installation and updates
 

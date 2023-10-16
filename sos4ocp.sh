@@ -233,7 +233,7 @@ else
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CGROUP")
-        POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '. | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' ${CRIO_PATH}/pods/crictl_inspectp_*))
+        POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
         echo -e "List of PODs including the cgroup: ${CGROUP}\n"
         ;;
       "NAMESPACE")
