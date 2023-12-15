@@ -12,6 +12,20 @@
 
 --------
 
+## Version 0.4.2
+
+### Minor updates - 0.4.2
+
+- None
+
+### Release updates - 0.4.2
+
+- (Main) Allowing to (q)uit from the POD list menu.
+- (Main) Updating pagination in the menu to be similar accross the displays.
+- (Main) Enforcing statement to avoid a combinaison of numbers/letters in the choices
+
+--------
+
 ## Version 0.4.1
 
 ### Minor updates - 0.4.1

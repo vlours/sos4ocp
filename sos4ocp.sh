@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 0.4.1
+# @VERSION     # 0.4.2
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -88,12 +88,12 @@ do
   echo
   echo -e "$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
-    echo "[$[NUM+1]] - $(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
+    echo "[$[NUM+1]]|$(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
-  done)\n[q] - Quit" | column -t -s'|'
+  done)\n[q]|Quit" | column -t -s'|'
   printf "Choice: "
   read REP
-  if ([[ ${REP} != [qQ] ]] && [[ ${REP} != [0-9]* ]]) || ([[ ${REP} == [0-9]* ]] && ([[ ${REP} -gt ${OPTION_NUM} ]] || [[ ${REP} -le 0 ]]))
+  if ([[ ${REP} != [qQ] ]] && (! [[ ${REP} =~ ^[0-9]+$ ]])) || ([[ ${REP} =~ ^[0-9]+$ ]] && ([[ ${REP} -gt ${OPTION_NUM} ]] || [[ ${REP} -le 0 ]]))
   then
     clear
     echo "Invalid Choice: ${REP}"
@@ -117,23 +117,27 @@ if [[ ${POD_NUM} == 0 ]]
 then
   echo -e "Unable to retrieve the list of POD. Please review the content of the file: ${CRIO_PATH}/crictl_pods\n" && fct_help && exit 15
 fi
-while [[ ${REP} == "" ]]
+while ([[ ${REP} != [qQ] ]] &&  [[ ${PODID} == "null" ]])
 do
   NUM=0
   echo -e ",POD_ID,POD_NAME,NAMESPACE\n$(while [[ ${NUM} -lt ${POD_NUM} ]]
   do
     echo "[$[NUM+1]],$(echo ${POD_LIST[${NUM}]})"
     NUM=$[NUM+1]
-  done)" | column -t -s','
+  done)\n[q],Quit" | column -t -s','
   printf "Choice: "
   read REP
-  if ([[ ${REP} != [0-9]* ]]) || ([[ ${REP} == [0-9]* ]] && ([[ ${REP} -gt ${POD_NUM} ]] || [[ ${REP} -le 0 ]]))
+  if ([[ ${REP} != [qQ] ]] && (! [[ ${REP} =~ ^[0-9]+$ ]])) || ([[ ${REP} =~ ^[0-9]+$ ]] && ([[ ${REP} -gt ${POD_NUM} ]] || [[ ${REP} -le 0 ]]))
   then
     clear
     echo "Invalid Choice: ${REP}"
-    REP=""
   else
-      PODID=$(echo ${POD_LIST[$[REP-1]]} | cut -d',' -f1)
+      if [[ ${REP} != [qQ] ]]
+      then
+        PODID=$(echo ${POD_LIST[$[REP-1]]} | cut -d',' -f1)
+      else
+        exit 0
+      fi
   fi
 done
 }
