@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 0.4.2
+# @VERSION     # 1.0.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -16,7 +16,7 @@ fct_help(){
   then
     ScriptName=$(basename $0)
   fi
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>] ${purpletext}[-h]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes>] ${purpletext}[-h]${resetcolor}"
   echo -e "\nif none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.\n"
   OPTION_TAB=8
   DESCR_TAB=63
@@ -30,6 +30,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-c" "Name of a CONTAINER" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-S" "Display all containers stats by [name,cpu,mem,disk,inodes]" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
@@ -54,24 +55,32 @@ fct_title_details() {
 }
 
 # Display the POD Inspect
-fct_inspectp(){
-  FCT_CMD="less ${CRIO_PATH}/pods/crictl_inspectp_${1}*"
-  echo -e "\n${FCT_CMD}"
-  ${FCT_CMD}
-}
-
-# Display the Container Inspect
-fct_inspectc(){
-  FCT_CMD="less ${CRIO_PATH}/containers/crictl_inspect_${1}*"
-  echo -e "\n${FCT_CMD}"
-  ${FCT_CMD}
-}
-
-# Dispaly the Container Log
-fct_container_log(){
-  FCT_CMD="less ${CRIO_PATH}/containers/logs/crictl_logs_-t_${1}*"
-  echo -e "\n${FCT_CMD}"
-  ${FCT_CMD}
+fct_inspect(){
+  case ${1} in
+    "container")
+      FILEPATH="${CRIO_PATH}/containers/crictl_inspect_${2}"
+      ;;
+    "log")
+      if [[ -d ${CRIO_PATH}/containers/logs/ ]]
+      then
+        FILEPATH="${CRIO_PATH}/containers/logs/crictl_logs_-t_${2}"
+      else
+        FILEPATH="${CRIO_PATH}/containers/crictl_logs_-t_${2}"
+      fi
+      ;;
+    "pod")
+      FILEPATH="${CRIO_PATH}/pods/crictl_inspectp_${2}"
+      ;;
+  esac
+  FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)
+  if [[ -z ${FILENAME} ]]
+  then
+    echo -e "\nWARN: Unable to locate a ${1} file in the matching the PATH: ${FILEPATH}*"
+  else
+    FCT_CMD="less ${FILENAME}"
+    echo -e "\n${FCT_CMD}"
+    ${FCT_CMD}
+  fi
 }
 
 # Display the Main Menu
@@ -82,11 +91,11 @@ while [[ ${REP} != [qQ] ]]
 do
   NUM=0
   fct_title "POD Details"
-  echo "$POD_DETAILS" | column -t | sed -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/"
+  echo -e "${POD_HEADER}\n${POD_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\) ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   fct_title "Containers Details"
-  echo "$CONTAINER_DETAILS" | column -t | sed -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/"
+  echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   echo
-  echo -e "$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
+  echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
     echo "[$[NUM+1]]|$(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
@@ -142,10 +151,40 @@ do
 done
 }
 
+# Collect the container details
+fct_container_details(){
+CONTAINER_DETAILS=${CONTAINER_DETAILS:-$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
+if [[ -z ${CONTAINER_DETAILS} ]]
+then
+  CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+  CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-2)}'))
+else
+  if [[ -z ${CONTAINER_IDS} ]]
+  then
+    CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-3)}'))
+  fi
+fi
+}
+
+#Retrieve container statistic
+fct_container_statistic(){
+  awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+}
 ##### Main
 
 # Set a default STD_ERR, which can be replaced for debugging to "/dev/stderr"
 STD_ERR="${STD_ERR:-/dev/null}"
+
+# Color list
+graytext=${graytext:-"\x1B[30m"}
+redtext=${redtext:-"\x1B[31m"}
+greentext=${greentext:-"\x1B[32m"}
+yellowtext=${yellowtext:-"\x1B[33m"}
+bluetext=${bluetext:-"\x1B[34m"}
+purpletext=${purpletext:-"\x1B[35m"}
+cyantext=${cyantext:-"\x1B[36m"}
+whitetext=${whitetext:-"\x1B[37m"}
+resetcolor=${resetcolor:-"\x1B[0m"}
 
 # Getops
 if [[ $# != 0 ]]
@@ -156,7 +195,7 @@ then
     fct_help && exit 1
   fi
   OPTNUM=0
-  while getopts :i:n:c:s:g:p:h arg; do
+  while getopts :i:n:c:s:g:p:S:h arg; do
   case $arg in
       i)
         PODID=${OPTARG}
@@ -185,6 +224,32 @@ then
         ;;
       s)
         SOSREPORT_PATH=$(echo ${OPTARG} | sed -e "s/\/*$//")
+        ;;
+      S)
+        SORT_KEY=${OPTARG:-"name"}
+        case ${SORT_KEY} in
+          name)
+            SORT_VALUE=2
+            ;;
+          cpu)
+            SORT_VALUE=8
+            ;;
+          mem)
+            SORT_VALUE=9
+            ;;
+          disk)
+            SORT_VALUE=10
+            ;;
+          inodes)
+            SORT_VALUE=11
+            ;;
+          *)
+            echo "Err: invalid sorting key '${SORT_KEY}' for the container statistic"
+            fct_help && exit 5
+            ;;
+        esac
+        PODFILTER="STATISTIC"
+        OPTNUM=$[OPTNUM + 1]
         ;;
       h)
         fct_help && exit 0
@@ -231,7 +296,7 @@ then
 else
   if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]]
   then
-    case $PODFILTER in
+    case ${PODFILTER} in
       "CONTAINER")
         POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){print $(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
@@ -243,6 +308,21 @@ else
       "NAMESPACE")
         POD_IDS_LIST=($(awk -v pod_namespace=${NAMESPACE} '{if($(NF-2) == pod_namespace){printf "%s ",$1}}' ${CRIO_PATH}/crictl_pods))
         echo -e "List of PODs from the namespce: ${NAMESPACE}\n"
+        ;;
+      "STATISTIC")
+        if [[ -f ${CRIO_PATH}/crictl_stats ]]
+        then
+          POD_DETAILS=$(grep -Ev "^POD" ${CRIO_PATH}/crictl_pods)
+          CONTAINER_DETAILS=$(awk '{if($1 != "CONTAINER"){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+          if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "POD" ]]
+          then
+            CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,$8,$1,$5,$4,$3,$6}'))
+          else
+            CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
+          fi
+        else
+          echo -e "Unable to find the stats file: ${CRIO_PATH}/crictl_stats." && fct_help && exit 7
+        fi
         ;;
     esac
     if [[ ${#POD_IDS_LIST[@]} == 1 ]]
@@ -262,7 +342,8 @@ fi
 PODID=$(echo ${PODID}  | cut -c1-13)
 
 # Collect the POD Details & set the missing value
-POD_DETAILS=$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods | sed -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+POD_HEADER=$(awk '($1 == "POD"){print}' ${CRIO_PATH}/crictl_pods | sed -e "s/POD ID/POD_ID/")
+POD_DETAILS=${POD_DETAILS:-$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
 if [[ -z "${POD_DETAILS}" ]]
 then
   echo -e "Unable to find a POD from the specified parameter\n" && fct_help && exit 10
@@ -276,26 +357,30 @@ then
   PODNAME=$(echo "${POD_DETAILS}" | awk '{print $(NF-3)}')
 fi
 # Collect the Container(s) details and create an Array with the IDs
-CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
-if [[ -z ${CONTAINER_DETAILS} ]]
+fct_container_details
+
+if [[ ${PODFILTER} == "STATISTIC" ]]
 then
-  CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
-  CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-2)}'))
+  NUM=0
+  OPTION_NUM=$(echo ${#CONTAINER_IDS[@]})
+  echo -e "POD ID|POD NAME|CONTAINER ID|CONTAINER NAME|STATE|CREATED|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|---------|------------|--------------|-----|-------|-------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
+  do
+    CONTAINER_ID=$(echo ${CONTAINER_IDS[${NUM}]} | cut -d'|' -f3)
+    echo "$(echo ${CONTAINER_IDS[${NUM}]} | cut -d',' -f1)|$(fct_container_statistic ${CONTAINER_ID})" | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/"
+    NUM=$[NUM+1]
+  done | sort -hr -t'|' -k${SORT_VALUE})" | column -t -s'|'
 else
-  CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-3)}'))
+  # Create the List of option  for the Menu
+  CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
+  LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspect "pod" ${PODID}")
+  for CONTAINER_INFO in ${CONTAINER_IDS[*]}
+  do
+    CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
+    CONTAINER_NAME=$(echo ${CONTAINER_INFO} | cut -d',' -f2)
+    LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+    LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
+  done
+  OPTION_NUM=$(echo ${#LIST_OPTION[@]})
+  fct_display_menu
 fi
-
-
-
-# Create the List of option  for the Menu
-LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspectp ${PODID}")
-for CONTAINER_INFO in ${CONTAINER_IDS[*]}
-do
-  CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
-  CONTAINER_NAME=$(echo ${CONTAINER_INFO} | cut -d',' -f2)
-  LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspectc ${CONTAINER_ID}")
-  LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_container_log ${CONTAINER_ID}")
-done
-OPTION_NUM=$(echo ${#LIST_OPTION[@]})
-fct_display_menu
 exit 0

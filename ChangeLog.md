@@ -12,6 +12,23 @@
 
 --------
 
+## Version 1.0.0
+
+### Minor updates - 1.0.0
+
+- (Main) Allowing to display the container statistics by cpu, mem, disk or inodes with the new option '-S'
+- (Global) Set the script as stable and move to release 1.X.X
+
+### Release updates - 1.0.0
+
+- (Main) Including the Container resources usage when displaying the container menu.
+- (Main) Merging of the inspect functions.
+- (Main) Adding headers to the POD and Containers details.
+- (Main) Including colors to display the help in right format (and maybe future usages)
+- (README) Including the new option from the help output.
+
+--------
+
 ## Version 0.4.2
 
 ### Minor updates - 0.4.2
