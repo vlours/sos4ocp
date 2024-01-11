@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.0.1
+
+### Minor updates - 1.0.1
+
+- None
+
+### Release updates - 1.0.1
+
+- Adding the POD status when displaying the POD menu.
+- Sorting the POD Menu by POD status and Namespace
+
+--------
+
 ## Version 1.0.0
 
 ### Minor updates - 1.0.0

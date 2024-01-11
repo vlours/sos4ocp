@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.0.0
+# @VERSION     # 1.0.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -291,7 +291,7 @@ clear
 
 if [[ ${OPTNUM} == 0 ]]
 then
-  POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s ",$1,$(NF-3),$(NF-2)}}' ${CRIO_PATH}/crictl_pods))
+  POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods | sort -r -k 4 -k3 -t',' | awk '{printf "%s ",$0}'))
   fct_pod_list_menu
 else
   if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]]
@@ -331,7 +331,7 @@ else
     else
       if [[ ${#POD_IDS_LIST[@]} -ge 2 ]]
       then
-        POD_LIST=($(awk -v pod_ids="$(echo "${POD_IDS_LIST[@]}")" 'BEGIN{split(pod_ids,pod_array," ")}{for(ID in pod_array){if($1 == pod_array[ID]){printf "%s,%s,%s ",$1,$(NF-3),$(NF-2)}}}' ${CRIO_PATH}/crictl_pods))
+        POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods | sort -r -k 4 -k3 -t',' | awk -F',' -v pod_ids="$(echo "${POD_IDS_LIST[@]}")" 'BEGIN{split(pod_ids,pod_array," ")}{for(ID in pod_array){if($1 == pod_array[ID]){printf "%s ",$0}}}'))
         fct_pod_list_menu
       fi
     fi
