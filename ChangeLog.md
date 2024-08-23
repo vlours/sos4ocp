@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.0.2
+
+### Minor updates - 1.0.2
+
+- None
+
+### Release updates - 1.0.2
+
+- 'crictl stats' is now providing the name of the container. Including this in the stat function.
+
+--------
+
 ## Version 1.0.1
 
 ### Minor updates - 1.0.1
