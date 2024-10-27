@@ -76,5 +76,5 @@ if none of the filtering parameters is used, the script will display a menu with
 |      -h | display this help and check for updated version                 |                                                                               |
 |-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 
-Current Version: X.X.X
+Current Version: X.Y.Z
 ```
