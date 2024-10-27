@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.0.2
+# @VERSION     # 1.0.3
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -58,18 +58,33 @@ fct_title_details() {
 fct_inspect(){
   case ${1} in
     "container")
-      FILEPATH="${CRIO_PATH}/containers/crictl_inspect_${2}"
+      if [[ -d ${CRIO_PATH}/containers/ ]]
+      then
+        FILEPATH="${CRIO_PATH}/containers/crictl_inspect_${2}"
+      else
+        FILEPATH="${CRIO_PATH}/crictl_inspect_${2}"
+      fi
       ;;
     "log")
       if [[ -d ${CRIO_PATH}/containers/logs/ ]]
       then
         FILEPATH="${CRIO_PATH}/containers/logs/crictl_logs_-t_${2}"
       else
-        FILEPATH="${CRIO_PATH}/containers/crictl_logs_-t_${2}"
+        if [[ -d ${CRIO_PATH}/containers/ ]]
+        then
+          FILEPATH="${CRIO_PATH}/containers/crictl_logs_-t_${2}"
+        else
+          FILEPATH="${CRIO_PATH}/crictl_logs_-t_${2}"
+        fi
       fi
       ;;
     "pod")
-      FILEPATH="${CRIO_PATH}/pods/crictl_inspectp_${2}"
+      if [[ -d ${CRIO_PATH}/pods/ ]]
+      then
+        FILEPATH="${CRIO_PATH}/pods/crictl_inspectp_${2}"
+      else
+        FILEPATH="${CRIO_PATH}/crictl_inspectp_${2}"
+      fi
       ;;
   esac
   FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)

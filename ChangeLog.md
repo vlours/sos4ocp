@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.0.3
+
+### Minor updates - 1.0.3
+
+- None
+
+### Release updates - 1.0.3
+
+- Add alternative PATH for the crictl outputs (inspects and logs)
+
+--------
+
 ## Version 1.0.2
 
 ### Minor updates - 1.0.2
