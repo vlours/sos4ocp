@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.0.4
+
+### Minor updates - 1.0.4
+
+- None
+
+### Release updates - 1.0.4
+
+- (Main) Adding the option '-I', allowing pod/container review from a specific 'container ID' (truncated to 13 characters)
+
+--------
+
 ## Version 1.0.3
 
 ### Minor updates - 1.0.3

@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.0.3
+# @VERSION     # 1.0.4
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -16,7 +16,7 @@ fct_help(){
   then
     ScriptName=$(basename $0)
   fi
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes>] ${purpletext}[-h]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes>] ${purpletext}[-h]${resetcolor}"
   echo -e "\nif none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.\n"
   OPTION_TAB=8
   DESCR_TAB=63
@@ -27,6 +27,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-s" "Path to access the SOSREPORT base folder" "<Current folder> [.]"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-p" "Name of the POD" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-i" "UID of the POD" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-I" "UID of the container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-c" "Name of a CONTAINER" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD" "null"
@@ -210,12 +211,17 @@ then
     fct_help && exit 1
   fi
   OPTNUM=0
-  while getopts :i:n:c:s:g:p:S:h arg; do
+  while getopts :i:I:n:c:s:g:p:S:h arg; do
   case $arg in
       i)
         PODID=${OPTARG}
         OPTNUM=$[OPTNUM + 1]
         PODFILTER="ID"
+        ;;
+      I)
+        CONTAINERID=${OPTARG:0:13}
+        OPTNUM=$[OPTNUM + 1]
+        PODFILTER="CONTAINERID"
         ;;
       p)
         PODNAME=${OPTARG}
@@ -314,6 +320,15 @@ else
     case ${PODFILTER} in
       "CONTAINER")
         POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){print $(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+        echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
+        ;;
+      "CONTAINERID")
+        if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "ID" ]]
+        then
+          POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+        else
+          POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+        fi
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CGROUP")
