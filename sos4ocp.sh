@@ -184,7 +184,13 @@ fi
 
 #Retrieve container statistic
 fct_container_statistic(){
-  awk -v container_id=$1 'BEGIN{if($2 == "NAME"){Include_Name=true}}{if($1 == container_id){if(Include_Name==true){stats=$3"|"$4"|"$5"|"$6}else{stats=$2"|"$3"|"$4"|"$5}}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+  #Check if the container name is included in the crictl_stats data
+  if [[ $(awk 'BEGIN{namepresence="false"}{if($2 == "NAME"){namepresence="true"}}END{print namepresence}' ${CRIO_PATH}/crictl_stats) == "true" ]]
+  then
+    awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+  else
+    awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+  fi
 }
 ##### Main
 
