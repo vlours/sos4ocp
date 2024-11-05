@@ -21,6 +21,7 @@
 ### Release updates - 1.0.4
 
 - (Main) Adding the option '-I', allowing pod/container review from a specific 'container ID' (truncated to 13 characters)
+- (Main) fixing the function 'fct_container_statistic' to correctly match the crictl_stats output.
 
 --------
 
