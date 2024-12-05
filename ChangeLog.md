@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.0.5
+
+### Minor updates - 1.0.5
+
+- None
+
+### Release updates - 1.0.5
+
+- Adding a new column to display the number of container restart when selecting the container in the menu.
+- Reduce the number of calls to check for the Container/POD/Log PATHs.
+
+--------
+
 ## Version 1.0.4
 
 ### Minor updates - 1.0.4
