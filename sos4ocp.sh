@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.0.4
+# @VERSION     # 1.0.5
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -59,33 +59,13 @@ fct_title_details() {
 fct_inspect(){
   case ${1} in
     "container")
-      if [[ -d ${CRIO_PATH}/containers/ ]]
-      then
-        FILEPATH="${CRIO_PATH}/containers/crictl_inspect_${2}"
-      else
-        FILEPATH="${CRIO_PATH}/crictl_inspect_${2}"
-      fi
+      FILEPATH="${CONTAINERPATH}/crictl_inspect_${2}"
       ;;
     "log")
-      if [[ -d ${CRIO_PATH}/containers/logs/ ]]
-      then
-        FILEPATH="${CRIO_PATH}/containers/logs/crictl_logs_-t_${2}"
-      else
-        if [[ -d ${CRIO_PATH}/containers/ ]]
-        then
-          FILEPATH="${CRIO_PATH}/containers/crictl_logs_-t_${2}"
-        else
-          FILEPATH="${CRIO_PATH}/crictl_logs_-t_${2}"
-        fi
-      fi
+      FILEPATH="${LOGPATH}/crictl_logs_-t_${2}"
       ;;
     "pod")
-      if [[ -d ${CRIO_PATH}/pods/ ]]
-      then
-        FILEPATH="${CRIO_PATH}/pods/crictl_inspectp_${2}"
-      else
-        FILEPATH="${CRIO_PATH}/crictl_inspectp_${2}"
-      fi
+      FILEPATH="${PODPATH}/crictl_inspectp_${2}"
       ;;
   esac
   FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)
@@ -111,7 +91,7 @@ do
   fct_title "Containers Details"
   echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   echo
-  echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
+  echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
     echo "[$[NUM+1]]|$(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
@@ -167,7 +147,7 @@ do
 done
 }
 
-# Collect the container details
+# Collect the containers details
 fct_container_details(){
 CONTAINER_DETAILS=${CONTAINER_DETAILS:-$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
 if [[ -z ${CONTAINER_DETAILS} ]]
@@ -314,6 +294,27 @@ then
   fi
 fi
 
+if [[ -d ${CRIO_PATH}/containers/logs/ ]]
+then
+  LOGPATH="${CRIO_PATH}/containers/logs"
+  CONTAINERPATH="${CRIO_PATH}/containers"
+else
+  if [[ -d ${CRIO_PATH}/containers/ ]]
+  then
+    LOGPATH="${CRIO_PATH}/containers"
+    CONTAINERPATH="${CRIO_PATH}/containers"
+  else
+    LOGPATH="${CRIO_PATH}"
+    CONTAINERPATH="${CRIO_PATH}"
+  fi
+fi
+if [[ -d ${CRIO_PATH}/pods/ ]]
+then
+  PODPATH="${CRIO_PATH}/pods"
+else
+  PODPATH="${CRIO_PATH}/"
+fi
+
 clear
 
 if [[ ${OPTNUM} == 0 ]]
@@ -413,7 +414,14 @@ else
   do
     CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
     CONTAINER_NAME=$(echo ${CONTAINER_INFO} | cut -d',' -f2)
-    LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+    FILEPATH="${CONTAINERPATH}/crictl_inspect_${CONTAINER_ID}"
+    FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)
+    if [[ -f ${FILENAME} ]]
+    then
+      ATTEMPTS=$(jq -r '.status.metadata.attempt' ${FILENAME} 2>/dev/null)
+    fi
+    ATTEMPTS=${ATTEMPTS:-"N/A"}
+    LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
     LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
   done
   OPTION_NUM=$(echo ${#LIST_OPTION[@]})
