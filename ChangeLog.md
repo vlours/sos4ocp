@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.0.6
+
+### Minor updates - 1.0.6
+
+- None
+
+### Release updates - 1.0.6
+
+- Now allowing to sort by state and attempt
+- Fixing the sort to use the human reading when required.
+
+--------
+
 ## Version 1.0.5
 
 ### Minor updates - 1.0.5
