@@ -56,26 +56,26 @@ If you provide the full PODID, the script will trunk it to 13 characters.
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes>] [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes|state|attempt>] [-h]
 
 if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
 
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Options | Description                                                     | [Default]                                                                     |
-|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
-|      -s | Path to access the SOSREPORT base folder                        | <Current folder> [.]                                                          |
-|      -p | Name of the POD                                                 | null                                                                          |
-|      -i | UID of the POD                                                  | null                                                                          |
-|      -I | UID of the container                                            | null                                                                          |
-|      -c | Name of a CONTAINER                                             | null                                                                          |
-|      -n | NAMESPACE related to PODs                                       | null                                                                          |
-|      -g | CGROUP attached to a POD                                        | null                                                                          |
-|      -S | Display all containers stats by [name,cpu,mem,disk,inodes]      | null                                                                          |
-|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
-|         | Additional Options:                                             |                                                                               |
-|---------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
-|      -h | display this help and check for updated version                 |                                                                               |
-|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+|-----------------------------------------------------------------------------------------------------------|
+| Options | Description                                                              | [Default]            |
+|---------|--------------------------------------------------------------------------|----------------------|
+|      -s | Path to access the SOSREPORT base folder                                 | <Current folder> [.] |
+|      -p | Name of the POD                                                          | null                 |
+|      -i | UID of the POD                                                           | null                 |
+|      -I | UID of the container                                                     | null                 |
+|      -c | Name of a CONTAINER                                                      | null                 |
+|      -n | NAMESPACE related to PODs                                                | null                 |
+|      -g | CGROUP attached to a POD                                                 | null                 |
+|      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt] | null                 |
+|---------|--------------------------------------------------------------------------|----------------------|
+|         | Additional Options:                                                      |                      |
+|---------|--------------------------------------------------------------------------|----------------------|
+|      -h | display this help and check for updated version                          |                      |
+|-----------------------------------------------------------------------------------------------------------|
 
 Current Version: X.Y.Z
 ```
