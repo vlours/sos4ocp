@@ -46,10 +46,14 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 Simply run the script with the desired option(s)
 
 ```bash
-sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes>] [-h]
+sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes|state|attempt>] [-h]
 ```
 
-If you provide the full PODID, the script will trunk it to 13 characters.
+- If you provide the full PODID, the script will trunk it to 13 characters.
+- If you use the `-c`, `-g` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
+  ```text
+  [8]     Inspect Container:  kube-apiserver-cert-syncer  (64916b3d43187)  0  0.04  32.34MB  8.192kB  16      <<<<< Matching Filter
+  ```
 
 #### Script Options
 
@@ -69,7 +73,9 @@ if none of the filtering parameters is used, the script will display a menu with
 |      -I | UID of the container                                                     | null                 |
 |      -c | Name of a CONTAINER                                                      | null                 |
 |      -n | NAMESPACE related to PODs                                                | null                 |
-|      -g | CGROUP attached to a POD                                                 | null                 |
+|      -g | CGROUP attached to a POD or Container                                    | null                 |
+|         |  - CGROUP example for POD:        kubepods-burstable-pod<ID>             |                      |
+|         |  - CGROUP example for Container : crio-<ID>                              |                      |
 |      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt] | null                 |
 |---------|--------------------------------------------------------------------------|----------------------|
 |         | Additional Options:                                                      |                      |

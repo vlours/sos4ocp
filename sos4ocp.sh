@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.0.6
+# @VERSION     # 1.0.7
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -30,7 +30,9 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-I" "UID of the container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-c" "Name of a CONTAINER" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
-  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD or Container" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP example for POD:        kubepods-burstable-pod<ID>" ""
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP example for Container : crio-<ID>" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-S" "Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
@@ -91,7 +93,7 @@ do
   fct_title "Containers Details"
   echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   echo
-  echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
+  echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
     echo "[$[NUM+1]]|$(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
@@ -145,6 +147,16 @@ do
       fi
   fi
 done
+}
+
+# Extract POD reference from container ID
+fct_extract_from_container_id(){
+if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "ID" ]]
+then
+  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+else
+  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+fi
 }
 
 # Collect the containers details
@@ -342,16 +354,16 @@ else
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CONTAINERID")
-        if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "ID" ]]
-        then
-          POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
-        else
-          POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
-        fi
+        fct_extract_from_container_id
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CGROUP")
         POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        if [[ -z ${POD_IDS_LIST} ]]
+        then
+          CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CRIO_PATH}/containers/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+          fct_extract_from_container_id
+        fi
         echo -e "List of PODs including the cgroup: ${CGROUP}\n"
         ;;
       "NAMESPACE")
@@ -433,7 +445,12 @@ else
       ATTEMPTS=$(jq -r '.status.metadata.attempt' ${FILENAME} 2>/dev/null)
     fi
     ATTEMPTS=${ATTEMPTS:-"N/A"}
-    LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+    if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]])
+    then
+      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter,fct_inspect "container" ${CONTAINER_ID}")
+    else
+      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+    fi
     LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
   done
   OPTION_NUM=$(echo ${#LIST_OPTION[@]})

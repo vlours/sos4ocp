@@ -12,6 +12,21 @@
 
 --------
 
+## Version 1.0.7
+
+### Minor updates - 1.0.7
+
+- None
+
+### Release updates - 1.0.7
+
+- Allowing to filter the CGROUP using the container CGROUP (in addition of the POD)
+- Hightlighting the container line when the script is filtering using container details using the '-c', '-g' or '-I' options
+- Updating README file accordingly, with CGROUP examples.
+- Adding missing format after number of Attempts have been added.
+
+--------
+
 ## Version 1.0.6
 
 ### Minor updates - 1.0.6
