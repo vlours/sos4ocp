@@ -49,8 +49,9 @@ Simply run the script with the desired option(s)
 sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes|state|attempt>] [-h]
 ```
 
-- If you provide the full PODID, the script will trunk it to 13 characters.
-- If you use the `-c`, `-g` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
+* If you provide the full PODID, the script will trunk it to 13 characters.
+* If you use the `-c`, `-g` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
+
   ```text
   [8]     Inspect Container:  kube-apiserver-cert-syncer  (64916b3d43187)  0  0.04  32.34MB  8.192kB  16      <<<<< Matching Filter
   ```
