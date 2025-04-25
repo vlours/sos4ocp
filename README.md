@@ -43,46 +43,61 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 
 ### Basic Usage
 
-Simply run the script with the desired option(s)
+* Simply run the script with the desired option to display the POD/Container(s) details
 
-```bash
-sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes|state|attempt>] [-h]
-```
+    ```bash
+    sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-u <POD_UID>] [-h]
+    ```
+
+* Or the following command to display sort the containers by the desired statistic
+
+    ```bash
+    sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h]
+    ```
+
+*Notes:*
 
 * If you provide the full PODID, the script will trunk it to 13 characters.
-* If you use the `-c`, `-g` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
+* If you use the `-c`, `-g` , `-o` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
 
   ```text
   [8]     Inspect Container:  kube-apiserver-cert-syncer  (64916b3d43187)  0  0.04  32.34MB  8.192kB  16      <<<<< Matching Filter
   ```
 
-#### Script Options
+### Script Options
 
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-S <name|cpu|mem|disk|inodes|state|attempt>] [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-u <POD_UID>] [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h]
 
 if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
 
-|-----------------------------------------------------------------------------------------------------------|
-| Options | Description                                                              | [Default]            |
-|---------|--------------------------------------------------------------------------|----------------------|
-|      -s | Path to access the SOSREPORT base folder                                 | <Current folder> [.] |
-|      -p | Name of the POD                                                          | null                 |
-|      -i | UID of the POD                                                           | null                 |
-|      -I | UID of the container                                                     | null                 |
-|      -c | Name of a CONTAINER                                                      | null                 |
-|      -n | NAMESPACE related to PODs                                                | null                 |
-|      -g | CGROUP attached to a POD or Container                                    | null                 |
-|         |  - CGROUP example for POD:        kubepods-burstable-pod<ID>             |                      |
-|         |  - CGROUP example for Container : crio-<ID>                              |                      |
-|      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt] | null                 |
-|---------|--------------------------------------------------------------------------|----------------------|
-|         | Additional Options:                                                      |                      |
-|---------|--------------------------------------------------------------------------|----------------------|
-|      -h | display this help and check for updated version                          |                      |
-|-----------------------------------------------------------------------------------------------------------|
+|-----------------------------------------------------------------------------------------------------------------|
+| Options | Description                                                                    | [Default]            |
+|---------|--------------------------------------------------------------------------------|----------------------|
+|      -s | Path to access the SOSREPORT base folder                                       | <Current folder> [.] |
+|      -p | Name of the POD                                                                | null                 |
+|      -i | UID of the POD                                                                 | null                 |
+|      -I | UID of the container                                                           | null                 |
+|      -c | Name of a CONTAINER                                                            | null                 |
+|      -n | NAMESPACE related to PODs                                                      | null                 |
+|      -g | CGROUP attached to a POD or Container                                          | null                 |
+|      -o | Storage OVERLAY ID attached to a Container                                     | null                 |
+|      -u | storage UID attached to a POD                                                  | null                 |
+|      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]       | null                 |
+|---------|--------------------------------------------------------------------------------|----------------------|
+|         | Examples:                                                                      |                      |
+|         |  - CGROUP for POD:        kubepods-burstable-pod<ID>                           |                      |
+|         |  - CGROUP for Container:  crio-<ID>                                            |                      |
+|         |  - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged |                      |
+|         |  - POD_UID:               /var/lib/kubelet/pods/<POD_UID>/                     |                      |
+|---------|--------------------------------------------------------------------------------|----------------------|
+|         | Additional Options:                                                            |                      |
+|---------|--------------------------------------------------------------------------------|----------------------|
+|      -h | display this help and check for updated version                                |                      |
+|-----------------------------------------------------------------------------------------------------------------|
 
 Current Version: X.Y.Z
 ```
