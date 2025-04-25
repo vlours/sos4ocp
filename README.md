@@ -55,7 +55,7 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
     sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h]
     ```
 
-*Notes:*
+_Notes:_
 
 * If you provide the full PODID, the script will trunk it to 13 characters.
 * If you use the `-c`, `-g` , `-o` or `-I` option using the container details, the container will be highlighted in the menu with `<<<<< Matching Filter` at the end of the line.
