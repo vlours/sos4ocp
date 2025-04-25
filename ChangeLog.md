@@ -12,6 +12,20 @@
 
 --------
 
+## Version 1.1.0
+
+### Minor updates - 1.1.0
+
+- None
+
+### Release updates - 1.1.0
+
+- Allowing to filter from the POD UID included in the '/var/lib/pod'
+- Allowing to filter from the container Overlay ID in '/var/lib/containers/storage/overlay/'
+- Updating README file accordingly with new options
+
+--------
+
 ## Version 1.0.7
 
 ### Minor updates - 1.0.7
