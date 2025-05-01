@@ -217,6 +217,7 @@ fct_container_processes(){
         echo -e "\WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" && WARN=$[WARN + 1]
       else
         echo -e "\INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead"
+        PSFAUXWWW=${PSAUXWWWM}
       fi
     fi
     if [[ ${WARN} == 0 ]]
