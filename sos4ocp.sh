@@ -204,14 +204,21 @@ fct_container_processes(){
   else
     Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
     PSFAUXWWW=${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww
+    PSAUXWWWM=${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm
     PS_GROUP=${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup
-    for file in ${PSFAUXWWW} ${PS_GROUP}
-    do
-      if [[ ! -f ${file} ]]
+    if [[ ! -f ${PS_GROUP} ]]
+    then
+      echo -e "\WARN: File ${PS_GROUP} is missing" && WARN=$[WARN + 1]
+    fi
+    if [[ ! -f ${PSFAUXWWW} ]]
+    then
+      if [[ ! -f ${PSAUXWWWM} ]]
       then
-        echo -e "\WARN: File ${file} is missing" && WARN=$[WARN + 1]
+        echo -e "\WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" && WARN=$[WARN + 1]
+      else
+        echo -e "\INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead"
       fi
-    done
+    fi
     if [[ ${WARN} == 0 ]]
     then
       echo -e "\nList of processes attached to the cgroup: ${Container_cgroup}"
