@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.1.0
+# @VERSION     # 1.2.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -98,7 +98,7 @@ do
   fct_title "POD Details"
   echo -e "${POD_HEADER}\n${POD_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\) ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   fct_title "Containers Details"
-  echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
+  echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/" -e "s/\(Exited\)/${redtext}\1${resetcolor}/" -e "s/\(Running\)/${greentext}\1${resetcolor}/"
   echo
   echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
@@ -191,6 +191,36 @@ fct_container_statistic(){
     awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
   fi
 }
+
+#Display the Container's Process details
+fct_container_processes(){
+  container_id=$1
+  FILEPATH="${CONTAINERPATH}/crictl_inspect_${container_id}"
+  FILENAME=$(ls -1 "${FILEPATH}"* 2>/dev/null)
+  WARN=0
+  if [[ -z ${FILENAME} ]]
+  then
+    echo -e "\nWARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*"
+  else
+    Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
+    PSFAUXWWW=${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww
+    PS_GROUP=${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup
+    for file in ${PSFAUXWWW} ${PS_GROUP}
+    do
+      if [[ ! -f ${file} ]]
+      then
+        echo -e "\WARN: File ${file} is missing" && WARN=$[WARN + 1]
+      fi
+    done
+    if [[ ${WARN} == 0 ]]
+    then
+      echo -e "\nList of processes attached to the cgroup: ${Container_cgroup}"
+      PROCESS_LIST="$(grep ${Container_cgroup} ${PS_GROUP} 2>/dev/null| awk '{printf "|^[a-zA-Z0-9+ ]*"$1"|^[a-zA-Z0-9+ ]*"$2}')"
+      grep -E "^USER${PROCESS_LIST}" ${PSFAUXWWW} | less
+    fi
+  fi
+}
+
 ##### Main
 
 # Set a default STD_ERR, which can be replaced for debugging to "/dev/stderr"
@@ -463,7 +493,7 @@ then
 else
   # Create the List of option  for the Menu
   CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
-  LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspect "pod" ${PODID}")
+  LIST_OPTION=("${purpletext}Inspect POD:|${PODNAME}|(${PODID})${resetcolor},fct_inspect "pod" ${PODID}")
   for CONTAINER_INFO in ${CONTAINER_IDS[*]}
   do
     CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
@@ -477,11 +507,12 @@ else
     ATTEMPTS=${ATTEMPTS:-"N/A"}
     if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]])
     then
-      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter,fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
     else
-      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
     fi
-    LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
+    LIST_OPTION+=("${greentext}Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_inspect "log" ${CONTAINER_ID}")
+    LIST_OPTION+=("${yellowtext}Display Container proc:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_container_processes ${CONTAINER_ID}")
   done
   OPTION_NUM=$(echo ${#LIST_OPTION[@]})
   fct_display_menu
