@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.1.0
+# @VERSION     # 1.2.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -16,8 +16,8 @@ fct_help(){
   then
     ScriptName=$(basename $0)
   fi
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-u <POD_UID>] ${purpletext}[-h]${resetcolor}"
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> ${purpletext}[-h]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] ${purpletext}[-h|-v]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> ${purpletext}[-h|-v]${resetcolor}"
   echo -e "\nif none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.\n"
   OPTION_TAB=8
   DESCR_TAB=78
@@ -33,6 +33,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD or Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-o" "Storage OVERLAY ID attached to a Container" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-P" "Process ID (PID) of a process attached to a Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-u" "storage UID attached to a POD" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-S" "Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
@@ -44,16 +45,44 @@ fct_help(){
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
-  printf "|${purpletext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "-h" "display this help and check for updated version" ""
+  printf "|${purpletext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "-h" "display this helpn" ""
+  printf "|${purpletext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "-v" "display the version and check for updates" ""
   printf "|%${OPTION_TAB}s---%-${DESCR_TAB}s---%-${DEFAULT_TAB}s|\n" |tr \  '-'
 
+  fct_version
+}
+
+fct_version() {
   Script=$(which $0 2>${STD_ERR})
   if [[ "${Script}" != "bash" ]] && [[ ! -z ${Script} ]]
   then
     VERSION=$(grep "@VERSION" ${Script} 2>${STD_ERR} | grep -Ev "VERSION=" | cut -d'#' -f3)
     VERSION=${VERSION:-" N/A"}
+    RANDOM_CHECK=$(awk -v min=1 -v max=${MAX_RANDOM} 'BEGIN{srand(); print int(min+rand()*(max-min+1))}')
+    if [[ ${RANDOM_CHECK} == 1 ]]
+    then
+      My_TTY=$(who am i | awk '{print $2}')
+      NEW_VERSION=$(curl -Ns --connect-timeout 2 --max-time 4 "${SOURCE_RAW_URL}" 2>${STD_ERR} | grep "@VERSION" | grep -Ev "VERSION=" | cut -d'#' -f3)
+      NEW_VERSION=${NEW_VERSION:-" N/A"}
+      if [[ "${VERSION}" != "${NEW_VERSION}" ]] && [[ "${NEW_VERSION}" != " N/A" ]] && [[ "${VERSION}" != " N/A" ]]
+      then
+        UPDATE_MSG="Current Version:\t${redtext}${VERSION}${resetcolor} | Please considere to update. Thanks\nAvailable Version:\t${NEW_VERSION}\n[Source: ${bluetext}${SOURCE_URL}${resetcolor}]"
+      else
+        if [[ "${NEW_VERSION}" == " N/A" ]] && [[ "${VERSION}" != " N/A" ]]
+        then
+          SCRIPT_mtime=$(ls -l ${ls_option} $(which $0) | awk '{print $(NF-1)}' | sed -e "s/+//")
+          Time_Gap=$[$Current_time - $SCRIPT_mtime]
+          if [[ ${Time_Gap} -gt ${Time_Gap_Alert} ]]
+          then
+            UPDATE_MSG="Current Version:\t${redtext}${VERSION}${resetcolor} | The script $(basename ${0}) is older (${Time_Gap}) than $[${Time_Gap_Alert} / 86400] days.\nPlease consider to update it if a new version is available. Thanks\n[Source: ${bluetext}${SOURCE_URL}${resetcolor}]"
+          fi
+        else
+          UPDATE_MSG="Current Version:\t${greentext}${VERSION}${resetcolor} | The script is up-to-date. Thanks"
+        fi
+      fi
+      echo -e "\n$UPDATE_MSG"
+    fi
   fi
-  echo -e "\nCurrent Version:\t${VERSION}"
 }
 
 # Titles
@@ -98,7 +127,7 @@ do
   fct_title "POD Details"
   echo -e "${POD_HEADER}\n${POD_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\) ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
   fct_title "Containers Details"
-  echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
+  echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/" -e "s/\(Exited\)/${redtext}\1${resetcolor}/" -e "s/\(Running\)/${greentext}\1${resetcolor}/"
   echo
   echo -e "OPTION|AVAILABLE ACTION|OBJECT NAME|REFERENCE|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|----------------|-----------|---------|-------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
@@ -191,11 +220,66 @@ fct_container_statistic(){
     awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
   fi
 }
+
+#Retrieve POD list based on CGROUP
+fct_cgroup(){
+  POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+  if [[ -z ${POD_IDS_LIST} ]]
+  then
+    CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CRIO_PATH}/containers/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+    fct_extract_from_container_id
+  fi
+}
+
+#Check PROC files
+fct_check_proc_files(){
+  WARN=0
+  if [[ ! -f ${PS_GROUP} ]]
+  then
+    echo "WARN: File ${PS_GROUP} is missing" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+    WARN=$[WARN + 1]
+  fi
+  if [[ ! -f ${PSFAUXWWW} ]]
+  then
+    if [[ ! -f ${PSAUXWWWM} ]]
+    then
+      echo "WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      WARN=$[WARN + 1]
+    else
+      echo "INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      PSFAUXWWW=${PSAUXWWWM}
+    fi
+  fi
+  echo ${WARN}
+}
+
+#Display the Container's Process details
+fct_container_processes(){
+  container_id=$1
+  FILEPATH="${CONTAINERPATH}/crictl_inspect_${container_id}"
+  FILENAME=$(ls -1 "${FILEPATH}"* 2>/dev/null)
+  echo
+  if [[ -z ${FILENAME} ]]
+  then
+    echo "WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*"
+  else
+    Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
+    WARN=$(fct_check_proc_files)
+    if [[ ${WARN} == 0 ]]
+    then
+      echo "List of processes attached to the cgroup: ${Container_cgroup}"
+      PROCESS_LIST="$(grep ${Container_cgroup} ${PS_GROUP} 2>/dev/null| awk '{printf "|^[a-zA-Z0-9+ ]*"$1"|^[a-zA-Z0-9+ ]*"$2}')"
+      grep -E "^USER${PROCESS_LIST}" ${PSFAUXWWW} | less
+    else
+      echo "ERR: Unable to retrieve the cgroup and/or PID as some files are missing."
+    fi
+  fi
+}
+
 ##### Main
 
 # Set a default STD_ERR, which can be replaced for debugging to "/dev/stderr"
 STD_ERR="${STD_ERR:-/dev/null}"
-
 # Color list
 graytext=${graytext:-"\x1B[30m"}
 redtext=${redtext:-"\x1B[31m"}
@@ -206,6 +290,11 @@ purpletext=${purpletext:-"\x1B[35m"}
 cyantext=${cyantext:-"\x1B[36m"}
 whitetext=${whitetext:-"\x1B[37m"}
 resetcolor=${resetcolor:-"\x1B[0m"}
+# Max random number to check for update
+MAX_RANDOM=10
+# Source URLs & version time_gap
+SOURCE_RAW_URL="https://raw.githubusercontent.com/vlours/sos4ocp/refs/heads/main/sos4ocp.sh"
+SOURCE_URL="https://github.com/vlours/sos4ocp/"
 
 # Getops
 if [[ $# != 0 ]]
@@ -216,7 +305,7 @@ then
     fct_help && exit 1
   fi
   OPTNUM=0
-  while getopts :i:I:p:c:g:n:o:u:s:S:h arg; do
+  while getopts :i:I:p:c:g:n:o:P:u:s:S:hv arg; do
   case $arg in
       i)
         PODID=${OPTARG}
@@ -252,6 +341,11 @@ then
         OVERLAY=${OPTARG}
         OPTNUM=$[OPTNUM + 1]
         PODFILTER="OVERLAY"
+        ;;
+      P)
+        PROC_PID=${OPTARG}
+        OPTNUM=$[OPTNUM + 1]
+        PODFILTER="PROCPID"
         ;;
       u)
         PODUID=${OPTARG}
@@ -302,6 +396,10 @@ then
       h)
         fct_help && exit 0
         ;;
+      v)
+        MAX_RANDOM=1
+        fct_version && exit 0
+        ;;
       ?)
         echo -e "Invalid option\n"
         fct_help && exit 1
@@ -321,6 +419,10 @@ PODID=${PODID:-"null"}
 CONTAINERNAME=${CONTAINERNAME:-"null"}
 CGROUP=${CGROUP:-"null"}
 NAMESPACE=${NAMESPACE:-"null"}
+# Other SOSREPORT File references
+PSFAUXWWW=${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww
+PSAUXWWWM=${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm
+PS_GROUP=${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup
 
 # Check if the PATH is valid
 if [[ ! -d ${CRIO_PATH} ]]
@@ -372,15 +474,10 @@ else
         ;;
       "CONTAINERID")
         fct_extract_from_container_id
-        echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
+        echo -e "List of PODs including the container ID: ${CONTAINERID}\n"
         ;;
       "CGROUP")
-        POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
-        if [[ -z ${POD_IDS_LIST} ]]
-        then
-          CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CRIO_PATH}/containers/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
-          fct_extract_from_container_id
-        fi
+        fct_cgroup
         echo -e "List of PODs including the cgroup: ${CGROUP}\n"
         ;;
       "NAMESPACE")
@@ -402,7 +499,7 @@ else
           echo -e "Unable to find the stats file: ${CRIO_PATH}/crictl_stats." && fct_help && exit 7
         fi
         ;;
-        "OVERLAY")
+      "OVERLAY")
         POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
         if [[ -z ${POD_IDS_LIST} ]]
         then
@@ -411,9 +508,20 @@ else
         fi
         echo -e "List of PODs including the overlay: ${OVERLAY}\n"
         ;;
-        "PODUID")
-          POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
-          echo -e "List of PODs including the POD_UID: ${PODUID}\n"
+      "PROCPID")
+        WARN=$(fct_check_proc_files)
+        if [[ ${WARN} == 0 ]]
+        then
+          CGROUP="$(awk -v  procid=${PROC_PID} '{if($1 == procid){print}}' ${PS_GROUP} 2>/dev/null | sed -e "s/.*crio-[a-z-]*\([0-9a-zA-Z_]*\).scope.*/\1/")"
+          fct_cgroup
+        else
+          echo "ERR: Unable to retrieve the Process ID details as the process files are missing."
+        fi
+        echo -e "List of PODs including the PROC_PID: ${PROC_PID}\n"
+        ;;
+      "PODUID")
+        POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        echo -e "List of PODs including the POD_UID: ${PODUID}\n"
         ;;
     esac
     if [[ ${#POD_IDS_LIST[@]} == 1 ]]
@@ -463,7 +571,7 @@ then
 else
   # Create the List of option  for the Menu
   CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
-  LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspect "pod" ${PODID}")
+  LIST_OPTION=("${purpletext}Inspect POD:|${PODNAME}|(${PODID})${resetcolor},fct_inspect "pod" ${PODID}")
   for CONTAINER_INFO in ${CONTAINER_IDS[*]}
   do
     CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
@@ -477,13 +585,16 @@ else
     ATTEMPTS=${ATTEMPTS:-"N/A"}
     if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]])
     then
-      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter,fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
     else
-      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
     fi
-    LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
+    LIST_OPTION+=("${greentext}Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_inspect "log" ${CONTAINER_ID}")
+    LIST_OPTION+=("${yellowtext}Display Container proc:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_container_processes ${CONTAINER_ID}")
   done
   OPTION_NUM=$(echo ${#LIST_OPTION[@]})
   fct_display_menu
 fi
+
+fct_version
 exit 0

@@ -12,16 +12,31 @@
 
 --------
 
+## Version 1.2.0
+
+### Minor updates - 1.2.0
+
+- Allowing to select and display processus details related to the container cgroup
+- Allowing to filter using the PID from container's processes
+- Introducing the **update version checker**, to allow the script to check for newer version from the Source repository
+
+### Release updates - 1.2.0
+
+- Adding colors in the POD menu to allow easy way to identify the requests (inspect, log, proc).
+- Highlighting container status (Running/Exited)
+- Updating README file accordingly with new options
+
+--------
+
 ## Version 1.1.0
 
 ### Minor updates - 1.1.0
 
-- None
+- Allowing to filter from the POD UID included in the '/var/lib/pod'
+- Allowing to filter from the container Overlay ID in '/var/lib/containers/storage/overlay/'
 
 ### Release updates - 1.1.0
 
-- Allowing to filter from the POD UID included in the '/var/lib/pod'
-- Allowing to filter from the container Overlay ID in '/var/lib/containers/storage/overlay/'
 - Updating README file accordingly with new options
 
 --------
