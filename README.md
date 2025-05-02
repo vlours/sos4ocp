@@ -46,7 +46,7 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 * Simply run the script with the desired option to display the POD/Container(s) details
 
     ```bash
-    sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-u <POD_UID>] [-h]
+    sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
     ```
 
 * Or the following command to display sort the containers by the desired statistic
@@ -69,8 +69,8 @@ _Notes:_
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-u <POD_UID>] [-h]
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h|-v]
 
 if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
 
@@ -85,6 +85,7 @@ if none of the filtering parameters is used, the script will display a menu with
 |      -n | NAMESPACE related to PODs                                                      | null                 |
 |      -g | CGROUP attached to a POD or Container                                          | null                 |
 |      -o | Storage OVERLAY ID attached to a Container                                     | null                 |
+|      -P | Process ID (PID) of a process attached to a Container                          | null                 |
 |      -u | storage UID attached to a POD                                                  | null                 |
 |      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]       | null                 |
 |---------|--------------------------------------------------------------------------------|----------------------|
@@ -96,8 +97,7 @@ if none of the filtering parameters is used, the script will display a menu with
 |---------|--------------------------------------------------------------------------------|----------------------|
 |         | Additional Options:                                                            |                      |
 |---------|--------------------------------------------------------------------------------|----------------------|
-|      -h | display this help and check for updated version                                |                      |
+|      -h | display this helpn                                                             |                      |
+|      -v | display the version and check for updates                                      |                      |
 |-----------------------------------------------------------------------------------------------------------------|
-
-Current Version: X.Y.Z
 ```
