@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.2.1
+
+### Minor updates - 1.2.1
+
+- None
+
+### Release updates - 1.2.1
+
+- Ensure that the SOSREPORT_PATH is valid before setting the other File references
+
+--------
+
 ## Version 1.2.0
 
 ### Minor updates - 1.2.0
