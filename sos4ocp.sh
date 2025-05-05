@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.0
+# @VERSION     # 1.2.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -413,29 +413,29 @@ then
   fct_help && exit 3
 fi
 SOSREPORT_PATH=${SOSREPORT_PATH:-.}
-CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
 PODNAME=${PODNAME:-"null"}
 PODID=${PODID:-"null"}
 CONTAINERNAME=${CONTAINERNAME:-"null"}
 CGROUP=${CGROUP:-"null"}
 NAMESPACE=${NAMESPACE:-"null"}
+
+# Check if the SOSREPORT_PATH is valid and set CRIO_PATH
+if [[ ! -d ${SOSREPORT_PATH}/sos_commands/crio ]]
+then
+  if [[ -d "$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)/sos_commands/crio" ]]
+  then
+    SOSREPORT_PATH=$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)
+  else
+    echo "Err: Unable to find the 'sos_commands' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
+    fct_help && exit 5
+  fi
+fi
+CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
+
 # Other SOSREPORT File references
 PSFAUXWWW=${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww
 PSAUXWWWM=${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm
 PS_GROUP=${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup
-
-# Check if the PATH is valid
-if [[ ! -d ${CRIO_PATH} ]]
-then
-
-  if [[ -d "$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)/sos_commands/crio" ]]
-  then
-    CRIO_PATH="$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)/sos_commands/crio"
-  else
-    echo "Err: Unable to find the crio folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
-    fct_help && exit 5
-  fi
-fi
 
 if [[ -d ${CRIO_PATH}/containers/logs/ ]]
 then
