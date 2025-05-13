@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.1
+# @VERSION     # 1.2.2
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -41,7 +41,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for POD:        kubepods-burstable-pod<ID>" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for Container:  crio-<ID>" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged" ""
-  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - POD_UID:               /var/lib/kubelet/pods/<POD_UID>/" ""
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - POD_UID from storage:  /var/lib/kubelet/pods/<POD_UID>/" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
@@ -250,7 +250,7 @@ fct_check_proc_files(){
       PSFAUXWWW=${PSAUXWWWM}
     fi
   fi
-  echo ${WARN}
+  return ${WARN}
 }
 
 #Display the Container's Process details
@@ -264,7 +264,8 @@ fct_container_processes(){
     echo "WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*"
   else
     Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
-    WARN=$(fct_check_proc_files)
+    fct_check_proc_files
+    WARN=$?
     if [[ ${WARN} == 0 ]]
     then
       echo "List of processes attached to the cgroup: ${Container_cgroup}"
@@ -509,7 +510,8 @@ else
         echo -e "List of PODs including the overlay: ${OVERLAY}\n"
         ;;
       "PROCPID")
-        WARN=$(fct_check_proc_files)
+        fct_check_proc_files
+        WARN=$?
         if [[ ${WARN} == 0 ]]
         then
           CGROUP="$(awk -v  procid=${PROC_PID} '{if($1 == procid){print}}' ${PS_GROUP} 2>/dev/null | sed -e "s/.*crio-[a-z-]*\([0-9a-zA-Z_]*\).scope.*/\1/")"

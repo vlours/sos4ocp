@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.2.2
+
+### Minor updates - 1.2.2
+
+- None
+
+### Release updates - 1.2.2
+
+- (README) Improve description of the 'POD_UID' example
+- Fixing a bug when the 'fct_check_proc_files' return was misinterpreted.
+
+--------
+
 ## Version 1.2.1
 
 ### Minor updates - 1.2.1

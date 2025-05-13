@@ -93,7 +93,7 @@ if none of the filtering parameters is used, the script will display a menu with
 |         |  - CGROUP for POD:        kubepods-burstable-pod<ID>                           |                      |
 |         |  - CGROUP for Container:  crio-<ID>                                            |                      |
 |         |  - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged |                      |
-|         |  - POD_UID:               /var/lib/kubelet/pods/<POD_UID>/                     |                      |
+|         |  - POD_UID from storage:  /var/lib/kubelet/pods/<POD_UID>/                     |                      |
 |---------|--------------------------------------------------------------------------------|----------------------|
 |         | Additional Options:                                                            |                      |
 |---------|--------------------------------------------------------------------------------|----------------------|
