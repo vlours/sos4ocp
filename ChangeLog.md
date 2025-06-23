@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.2.3
+
+### Minor updates - 1.2.3
+
+- None
+
+### Release updates - 1.2.3
+
+- Check if the content of the crictl_stats is valid
+- Improve crictl_stats management.
+
+--------
+
 ## Version 1.2.2
 
 ### Minor updates - 1.2.2

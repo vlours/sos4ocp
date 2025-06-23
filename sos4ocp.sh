@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.2
+# @VERSION     # 1.2.3
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -213,12 +213,17 @@ fi
 #Retrieve container statistic
 fct_container_statistic(){
   #Check if the container name is included in the crictl_stats data
-  if [[ $(awk 'BEGIN{namepresence="false"}{if($2 == "NAME"){namepresence="true"}}END{print namepresence}' ${CRIO_PATH}/crictl_stats) == "true" ]]
-  then
-    awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
-  else
-    awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
-  fi
+  case ${CRICTL_STATS_TYPE} in
+    "name")
+      awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+      ;;
+    "other")
+      awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+      ;;
+    *)
+      printf "-|-|-|-"
+      ;;
+  esac
 }
 
 #Retrieve POD list based on CGROUP
@@ -486,7 +491,7 @@ else
         echo -e "List of PODs from the namespce: ${NAMESPACE}\n"
         ;;
       "STATISTIC")
-        if [[ -f ${CRIO_PATH}/crictl_stats ]]
+        if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats) ]]
         then
           POD_DETAILS=$(grep -Ev "^POD" ${CRIO_PATH}/crictl_pods)
           CONTAINER_DETAILS=$(awk '{if($1 != "CONTAINER"){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
@@ -497,7 +502,7 @@ else
             CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
           fi
         else
-          echo -e "Unable to find the stats file: ${CRIO_PATH}/crictl_stats." && fct_help && exit 7
+          echo -e "Unable to find the stats file: ${CRIO_PATH}/crictl_stats.\n" && fct_help && exit 7
         fi
         ;;
       "OVERLAY")
@@ -559,6 +564,19 @@ then
 fi
 # Collect the Container(s) details and create an Array with the IDs
 fct_container_details
+
+# Check the type of crictl_stats files
+if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats) ]]
+then
+  if [[ $(awk 'BEGIN{namepresence="false"}{if($2 == "NAME"){namepresence="true"}}END{print namepresence}' ${CRIO_PATH}/crictl_stats) == "true" ]]
+  then
+    CRICTL_STATS_TYPE=name
+  else
+    CRICTL_STATS_TYPE=other
+  fi
+else
+  CRICTL_STATS_TYPE=none
+fi
 
 if [[ ${PODFILTER} == "STATISTIC" ]]
 then
