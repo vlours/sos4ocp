@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.3
+# @VERSION     # 1.2.4
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -502,7 +502,13 @@ else
             CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
           fi
         else
-          echo -e "Unable to find the stats file: ${CRIO_PATH}/crictl_stats.\n" && fct_help && exit 7
+          echo "WARN: Unable to proceed with the PODs' statistics"
+          if [[ ! -f ${CRIO_PATH}/crictl_stats ]]
+          then
+            echo -e "ERR: Unable to find the stats file: ${CRIO_PATH}/crictl_stats\n" && fct_help && exit 7
+          else
+            echo -e "ERR: Fatal error detected in the stats file: ${CRIO_PATH}/crictl_stats\n" && fct_help && exit 8
+          fi
         fi
         ;;
       "OVERLAY")

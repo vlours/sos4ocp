@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.2.4
+
+### Minor updates - 1.2.4
+
+- None
+
+### Release updates - 1.2.4
+
+- Improving the Error messages when crictl_stats file seems missing/corrupted.
+
+--------
+
 ## Version 1.2.3
 
 ### Minor updates - 1.2.3
