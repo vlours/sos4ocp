@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.4
+# @VERSION     # 1.2.5
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -228,10 +228,10 @@ fct_container_statistic(){
 
 #Retrieve POD list based on CGROUP
 fct_cgroup(){
-  POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+  POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
   if [[ -z ${POD_IDS_LIST} ]]
   then
-    CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CRIO_PATH}/containers/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+    CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
     fct_extract_from_container_id
   fi
 }
@@ -248,10 +248,10 @@ fct_check_proc_files(){
   then
     if [[ ! -f ${PSAUXWWWM} ]]
     then
-      echo "WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo "WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       WARN=$[WARN + 1]
     else
-      echo "INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo "INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       PSFAUXWWW=${PSAUXWWWM}
     fi
   fi
@@ -439,29 +439,24 @@ fi
 CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
 
 # Other SOSREPORT File references
-PSFAUXWWW=${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww
-PSAUXWWWM=${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm
-PS_GROUP=${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup
+PSFAUXWWW="${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww"
+PSAUXWWWM="${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm"
+PS_GROUP="${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup"
 
-if [[ -d ${CRIO_PATH}/containers/logs/ ]]
+LOGPATH=${LOGPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_logs_*") | sort -u)}
+if [[ -z ${LOGPATH} ]]
 then
-  LOGPATH="${CRIO_PATH}/containers/logs"
-  CONTAINERPATH="${CRIO_PATH}/containers"
-else
-  if [[ -d ${CRIO_PATH}/containers/ ]]
-  then
-    LOGPATH="${CRIO_PATH}/containers"
-    CONTAINERPATH="${CRIO_PATH}/containers"
-  else
-    LOGPATH="${CRIO_PATH}"
-    CONTAINERPATH="${CRIO_PATH}"
-  fi
+  echo "WARN: Unable to set variable \$LOGPATH, as unable to find any crictl_logs_\* file in the crio folder ${CRIO_PATH}"
 fi
-if [[ -d ${CRIO_PATH}/pods/ ]]
+CONTAINERPATH=${CONTAINERPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspect_*") | sort -u)}
+if [[ -z ${CONTAINERPATH} ]]
 then
-  PODPATH="${CRIO_PATH}/pods"
-else
-  PODPATH="${CRIO_PATH}/"
+  echo "WARN: Unable to set variable \$CONTAINERPATH, as unable to find any crictl_inspect_\* file in the crio folder ${CRIO_PATH}"
+fi
+PODPATH=${PODPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspectp*") | sort -u)}
+if [[ -z ${PODPATH} ]]
+then
+  echo "WARN: Unable to set variable \$PODPATH, as unable to find any crictl_inspectp_\* file in the crio folder ${CRIO_PATH}"
 fi
 
 clear
@@ -512,10 +507,10 @@ else
         fi
         ;;
       "OVERLAY")
-        POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
         if [[ -z ${POD_IDS_LIST} ]]
         then
-          CONTAINERID=$(jq -r --arg overlay "$(echo ${OVERLAY} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13])"' $(file ${CRIO_PATH}/containers/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+          CONTAINERID=$(jq -r --arg overlay "$(echo ${OVERLAY} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
           fct_extract_from_container_id
         fi
         echo -e "List of PODs including the overlay: ${OVERLAY}\n"
@@ -533,7 +528,7 @@ else
         echo -e "List of PODs including the PROC_PID: ${PROC_PID}\n"
         ;;
       "PODUID")
-        POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${CRIO_PATH}/pods/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
         echo -e "List of PODs including the POD_UID: ${PODUID}\n"
         ;;
     esac
