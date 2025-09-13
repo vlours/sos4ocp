@@ -12,6 +12,20 @@
 
 --------
 
+## Version 1.2.5
+
+### Minor updates - 1.2.5
+
+- None
+
+### Release updates - 1.2.5
+
+- Using 'find' to ensure to locate the crictl_inspect and crictl_logs files
+- Improving substitution when displaying message about missing PS files.
+- Enforce the usage of variables PODPATH, CONTAINERPATH and LOGPATH.
+
+--------
+
 ## Version 1.2.4
 
 ### Minor updates - 1.2.4
