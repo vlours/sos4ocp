@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.2.6
+
+### Minor updates - 1.2.6
+
+- None
+
+### Release updates - 1.2.6
+
+- Removing unnessecary blank line when using the '-v' option.
+- Fixing issue when the PID is not found while using the '-P' option.
+
+--------
+
 ## Version 1.2.5
 
 ### Minor updates - 1.2.5

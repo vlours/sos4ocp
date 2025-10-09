@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.5
+# @VERSION     # 1.2.6
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -49,7 +49,7 @@ fct_help(){
   printf "|${purpletext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "-v" "display the version and check for updates" ""
   printf "|%${OPTION_TAB}s---%-${DESCR_TAB}s---%-${DEFAULT_TAB}s|\n" |tr \  '-'
 
-  fct_version
+  echo "" && fct_version
 }
 
 fct_version() {
@@ -80,7 +80,7 @@ fct_version() {
           UPDATE_MSG="Current Version:\t${greentext}${VERSION}${resetcolor} | The script is up-to-date. Thanks"
         fi
       fi
-      echo -e "\n$UPDATE_MSG"
+      echo -e "$UPDATE_MSG"
     fi
   fi
 }
@@ -521,7 +521,10 @@ else
         if [[ ${WARN} == 0 ]]
         then
           CGROUP="$(awk -v  procid=${PROC_PID} '{if($1 == procid){print}}' ${PS_GROUP} 2>/dev/null | sed -e "s/.*crio-[a-z-]*\([0-9a-zA-Z_]*\).scope.*/\1/")"
-          fct_cgroup
+          if [[ ! -z ${CGROUP} ]]
+          then
+            fct_cgroup
+          fi
         else
           echo "ERR: Unable to retrieve the Process ID details as the process files are missing."
         fi
@@ -617,5 +620,5 @@ else
   fct_display_menu
 fi
 
-fct_version
+echo "" && fct_version
 exit 0
