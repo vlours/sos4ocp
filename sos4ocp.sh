@@ -120,6 +120,24 @@ fct_inspect(){
 # Display the Main Menu
 fct_display_menu(){
 clear
+LOGPATH=${LOGPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_logs_*")  2>/dev/null | sort -u)}
+if [[ -z ${LOGPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_logs_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$LOGPATH to the default: \${CRIO_PATH}/logs ${resetcolor}"
+  LOGPATH=${CRIO_PATH}/logs
+fi
+CONTAINERPATH=${CONTAINERPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspect_*")  2>/dev/null | sort -u)}
+if [[ -z ${CONTAINERPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_inspect_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$CONTAINERPATH to the default: \${CRIO_PATH}/containers ${resetcolor}"
+  CONTAINERPATH=${CRIO_PATH}/containers
+fi
+PODPATH=${PODPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspectp*")  2>/dev/null | sort -u)}
+if [[ -z ${PODPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_inspectp_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$PODPATH to the default: \${CRIO_PATH}/pods ${resetcolor}"
+  PODPATH=${PODPATH}/pods
+fi
 REP=""
 while [[ ${REP} != [qQ] ]]
 do
@@ -442,22 +460,6 @@ CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
 PSFAUXWWW="${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww"
 PSAUXWWWM="${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm"
 PS_GROUP="${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup"
-
-LOGPATH=${LOGPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_logs_*") | sort -u)}
-if [[ -z ${LOGPATH} ]]
-then
-  echo "WARN: Unable to set variable \$LOGPATH, as unable to find any crictl_logs_\* file in the crio folder ${CRIO_PATH}"
-fi
-CONTAINERPATH=${CONTAINERPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspect_*") | sort -u)}
-if [[ -z ${CONTAINERPATH} ]]
-then
-  echo "WARN: Unable to set variable \$CONTAINERPATH, as unable to find any crictl_inspect_\* file in the crio folder ${CRIO_PATH}"
-fi
-PODPATH=${PODPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspectp*") | sort -u)}
-if [[ -z ${PODPATH} ]]
-then
-  echo "WARN: Unable to set variable \$PODPATH, as unable to find any crictl_inspectp_\* file in the crio folder ${CRIO_PATH}"
-fi
 
 clear
 
