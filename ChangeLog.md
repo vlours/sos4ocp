@@ -12,6 +12,21 @@
 
 --------
 
+## Version 1.2.7
+
+### Minor updates - 1.2.7
+
+- None
+
+### Release updates - 1.2.7
+
+- Updating an Error message to to bring clarify on the issue.
+- Adding a test to confirm that the 'crictl' outputs are present on the sosreport.
+- Adding some std error redirection to avoid undesired error message.
+- Reviewing the exit return codes.
+
+--------
+
 ## Version 1.2.6
 
 ### Minor updates - 1.2.6

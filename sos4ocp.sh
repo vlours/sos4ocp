@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.6
+# @VERSION     # 1.2.7
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -207,18 +207,18 @@ done
 fct_extract_from_container_id(){
 if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "ID" ]]
 then
-  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
 else
-  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
 fi
 }
 
 # Collect the containers details
 fct_container_details(){
-CONTAINER_DETAILS=${CONTAINER_DETAILS:-$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
+CONTAINER_DETAILS=${CONTAINER_DETAILS:-$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
 if [[ -z ${CONTAINER_DETAILS} ]]
 then
-  CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+  CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
   CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-2)}'))
 else
   if [[ -z ${CONTAINER_IDS} ]]
@@ -233,10 +233,10 @@ fct_container_statistic(){
   #Check if the container name is included in the crictl_stats data
   case ${CRICTL_STATS_TYPE} in
     "name")
-      awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+      awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats 2>/dev/null
       ;;
     "other")
-      awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats
+      awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats 2>/dev/null
       ;;
     *)
       printf "-|-|-|-"
@@ -246,10 +246,10 @@ fct_container_statistic(){
 
 #Retrieve POD list based on CGROUP
 fct_cgroup(){
-  POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+  POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
   if [[ -z ${POD_IDS_LIST} ]]
   then
-    CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+    CONTAINERID=$(jq -r --arg cgroup "$(echo ${CGROUP} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null)
     fct_extract_from_container_id
   fi
 }
@@ -411,7 +411,7 @@ then
             ;;
           *)
             echo "Err: invalid sorting key '${SORT_KEY}' for the container statistic"
-            fct_help && exit 5
+            fct_help && exit 1
             ;;
         esac
         PODFILTER="STATISTIC"
@@ -434,7 +434,7 @@ fi
 if [[ ${OPTNUM} -ge 2 ]]
 then
   echo -e "Too many arguments!\n"
-  fct_help && exit 3
+  fct_help && exit 2
 fi
 SOSREPORT_PATH=${SOSREPORT_PATH:-.}
 PODNAME=${PODNAME:-"null"}
@@ -450,12 +450,22 @@ then
   then
     SOSREPORT_PATH=$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)
   else
-    echo "Err: Unable to find the 'sos_commands' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
+    echo "Err: Unable to find the 'crio' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
     fct_help && exit 5
   fi
 fi
 CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
 
+if [[ ! -f ${CRIO_PATH}/crictl_pods ]] || [[ ! -f ${CRIO_PATH}/crictl_ps_-a ]]
+then
+  if [[ -f ${CRIO_PATH}/systemctl_status_crio ]]
+  then
+    echo -e "Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' are missing. Please check the logs from ${CRIO_PATH}/systemctl_status_crio\n"
+  else
+    echo -e "Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' and the 'systemctl_status_crio' are missing. Please check the content of the sosreport\n"
+  fi
+  fct_help && exit 6
+fi
 # Other SOSREPORT File references
 PSFAUXWWW="${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww"
 PSAUXWWWM="${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm"
@@ -465,14 +475,14 @@ clear
 
 if [[ ${OPTNUM} == 0 ]]
 then
-  POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods | sort -r -k 4 -k3 -t',' | awk '{printf "%s ",$0}'))
+  POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sort -r -k 4 -k3 -t',' | awk '{printf "%s ",$0}'))
   fct_pod_list_menu
 else
   if [[ "${PODID}" == "null" ]] && [[ "${PODNAME}" == "null" ]]
   then
     case ${PODFILTER} in
       "CONTAINER")
-        POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){print $(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a | sort -u | awk '{printf "%s ",$(NF-1)}'))
+        POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){print $(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CONTAINERID")
@@ -484,14 +494,14 @@ else
         echo -e "List of PODs including the cgroup: ${CGROUP}\n"
         ;;
       "NAMESPACE")
-        POD_IDS_LIST=($(awk -v pod_namespace=${NAMESPACE} '{if($(NF-2) == pod_namespace){printf "%s ",$1}}' ${CRIO_PATH}/crictl_pods))
+        POD_IDS_LIST=($(awk -v pod_namespace=${NAMESPACE} '{if($(NF-2) == pod_namespace){printf "%s ",$1}}' ${CRIO_PATH}/crictl_pods 2>/dev/null))
         echo -e "List of PODs from the namespce: ${NAMESPACE}\n"
         ;;
       "STATISTIC")
-        if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats) ]]
+        if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats 2>/dev/null) ]]
         then
           POD_DETAILS=$(grep -Ev "^POD" ${CRIO_PATH}/crictl_pods)
-          CONTAINER_DETAILS=$(awk '{if($1 != "CONTAINER"){print}}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+          CONTAINER_DETAILS=$(awk '{if($1 != "CONTAINER"){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
           if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "POD" ]]
           then
             CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,$8,$1,$5,$4,$3,$6}'))
@@ -509,10 +519,10 @@ else
         fi
         ;;
       "OVERLAY")
-        POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
         if [[ -z ${POD_IDS_LIST} ]]
         then
-          CONTAINERID=$(jq -r --arg overlay "$(echo ${OVERLAY} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1))
+          CONTAINERID=$(jq -r --arg overlay "$(echo ${OVERLAY} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null)
           fct_extract_from_container_id
         fi
         echo -e "List of PODs including the overlay: ${OVERLAY}\n"
@@ -533,7 +543,7 @@ else
         echo -e "List of PODs including the PROC_PID: ${PROC_PID}\n"
         ;;
       "PODUID")
-        POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1)))
+        POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
         echo -e "List of PODs including the POD_UID: ${PODUID}\n"
         ;;
     esac
@@ -543,7 +553,7 @@ else
     else
       if [[ ${#POD_IDS_LIST[@]} -ge 2 ]]
       then
-        POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods | sort -r -k 4 -k3 -t',' | awk -F',' -v pod_ids="$(echo "${POD_IDS_LIST[@]}")" 'BEGIN{split(pod_ids,pod_array," ")}{for(ID in pod_array){if($1 == pod_array[ID]){printf "%s ",$0}}}'))
+        POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sort -r -k 4 -k3 -t',' | awk -F',' -v pod_ids="$(echo "${POD_IDS_LIST[@]}")" 'BEGIN{split(pod_ids,pod_array," ")}{for(ID in pod_array){if($1 == pod_array[ID]){printf "%s ",$0}}}'))
         fct_pod_list_menu
       fi
     fi
@@ -554,8 +564,8 @@ fi
 PODID=$(echo ${PODID}  | cut -c1-13)
 
 # Collect the POD Details & set the missing value
-POD_HEADER=$(awk '($1 == "POD"){print}' ${CRIO_PATH}/crictl_pods | sed -e "s/POD ID/POD_ID/")
-POD_DETAILS=${POD_DETAILS:-$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
+POD_HEADER=$(awk '($1 == "POD"){print}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/POD ID/POD_ID/")
+POD_DETAILS=${POD_DETAILS:-$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
 if [[ -z "${POD_DETAILS}" ]]
 then
   echo -e "Unable to find a POD from the specified parameter\n" && fct_help && exit 10
@@ -572,7 +582,7 @@ fi
 fct_container_details
 
 # Check the type of crictl_stats files
-if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats) ]]
+if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats 2>/dev/null) ]]
 then
   if [[ $(awk 'BEGIN{namepresence="false"}{if($2 == "NAME"){namepresence="true"}}END{print namepresence}' ${CRIO_PATH}/crictl_stats) == "true" ]]
   then
