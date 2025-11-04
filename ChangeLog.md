@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.2.8
+
+### Minor updates - 1.2.8
+
+- None
+
+### Release updates - 1.2.8
+
+- Moving some VARIABLE assignment from the function to the main section as they may be required there
+
+--------
+
 ## Version 1.2.7
 
 ### Minor updates - 1.2.7
