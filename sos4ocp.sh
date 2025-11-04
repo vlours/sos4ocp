@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.7
+# @VERSION     # 1.2.8
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -120,24 +120,6 @@ fct_inspect(){
 # Display the Main Menu
 fct_display_menu(){
 clear
-LOGPATH=${LOGPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_logs_*")  2>/dev/null | sort -u)}
-if [[ -z ${LOGPATH} ]]
-then
-  echo -e "${yellowtext}WARN: Unable to find any crictl_logs_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$LOGPATH to the default: \${CRIO_PATH}/logs ${resetcolor}"
-  LOGPATH=${CRIO_PATH}/logs
-fi
-CONTAINERPATH=${CONTAINERPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspect_*")  2>/dev/null | sort -u)}
-if [[ -z ${CONTAINERPATH} ]]
-then
-  echo -e "${yellowtext}WARN: Unable to find any crictl_inspect_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$CONTAINERPATH to the default: \${CRIO_PATH}/containers ${resetcolor}"
-  CONTAINERPATH=${CRIO_PATH}/containers
-fi
-PODPATH=${PODPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspectp*")  2>/dev/null | sort -u)}
-if [[ -z ${PODPATH} ]]
-then
-  echo -e "${yellowtext}WARN: Unable to find any crictl_inspectp_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$PODPATH to the default: \${CRIO_PATH}/pods ${resetcolor}"
-  PODPATH=${PODPATH}/pods
-fi
 REP=""
 while [[ ${REP} != [qQ] ]]
 do
@@ -455,6 +437,26 @@ then
   fi
 fi
 CRIO_PATH=${SOSREPORT_PATH}/sos_commands/crio
+
+# Check and Set the LOGPATH, CONTAINERPATH & PODPATH variables
+LOGPATH=${LOGPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_logs_*")  2>/dev/null | sort -u)}
+if [[ -z ${LOGPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_logs_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$LOGPATH to the default: \${CRIO_PATH}/logs ${resetcolor}"
+  LOGPATH=${CRIO_PATH}/logs
+fi
+CONTAINERPATH=${CONTAINERPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspect_*")  2>/dev/null | sort -u)}
+if [[ -z ${CONTAINERPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_inspect_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$CONTAINERPATH to the default: \${CRIO_PATH}/containers ${resetcolor}"
+  CONTAINERPATH=${CRIO_PATH}/containers
+fi
+PODPATH=${PODPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspectp*")  2>/dev/null | sort -u)}
+if [[ -z ${PODPATH} ]]
+then
+  echo -e "${yellowtext}WARN: Unable to find any crictl_inspectp_\* file in the crio folder: ${CRIO_PATH}\nSetting the variable \$PODPATH to the default: \${CRIO_PATH}/pods ${resetcolor}"
+  PODPATH=${PODPATH}/pods
+fi
 
 if [[ ! -f ${CRIO_PATH}/crictl_pods ]] || [[ ! -f ${CRIO_PATH}/crictl_ps_-a ]]
 then
