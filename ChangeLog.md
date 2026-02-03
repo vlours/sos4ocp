@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.2.9
+
+### Minor updates - 1.2.9
+
+- None
+
+### Release updates - 1.2.9
+
+- Fixing 'printf' issue when stats are missing.
+- Fixing the 'ATTEMPTS' when the inspect file is missing for the container.
+
+--------
+
 ## Version 1.2.8
 
 ### Minor updates - 1.2.8
