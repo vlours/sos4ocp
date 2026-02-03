@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.8
+# @VERSION     # 1.2.9
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -221,7 +221,7 @@ fct_container_statistic(){
       awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats 2>/dev/null
       ;;
     *)
-      printf "-|-|-|-"
+      echo | awk '{printf "-|-|-|-"}'
       ;;
   esac
 }
@@ -619,8 +619,9 @@ else
     if [[ -f ${FILENAME} ]]
     then
       ATTEMPTS=$(jq -r '.status.metadata.attempt' ${FILENAME} 2>/dev/null)
+    else
+      ATTEMPTS=$(awk -v containerid=${CONTAINER_ID} '{if($1 == containerid){printf "%s",$(NF-2)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null)
     fi
-    ATTEMPTS=${ATTEMPTS:-"N/A"}
     if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]])
     then
       LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
