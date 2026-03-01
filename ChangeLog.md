@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.3.0
+
+### Minor updates - 1.3.0
+
+- Adding the option '-D' to sort the images by size to help reviewing the space usage under disk pressure
+
+### Release updates - 1.3.0
+
+- None
+
+--------
+
 ## Version 1.2.9
 
 ### Minor updates - 1.2.9
