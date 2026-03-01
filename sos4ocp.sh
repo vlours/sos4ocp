@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.2.9
+# @VERSION     # 1.3.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -17,7 +17,7 @@ fct_help(){
     ScriptName=$(basename $0)
   fi
   echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] ${purpletext}[-h|-v]${resetcolor}"
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> ${purpletext}[-h|-v]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D ${purpletext}[-h|-v]${resetcolor}"
   echo -e "\nif none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.\n"
   OPTION_TAB=8
   DESCR_TAB=78
@@ -36,6 +36,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-P" "Process ID (PID) of a process attached to a Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-u" "storage UID attached to a POD" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-S" "Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-D" "List the image size to help troubleshoot diskPressure conditions" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Examples:" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for POD:        kubepods-burstable-pod<ID>" ""
@@ -282,6 +283,29 @@ fct_container_processes(){
   fi
 }
 
+# Image Size to help troubleshoot diskPressure conditions
+fct_image_size(){
+  IMAGEPATH=${IMAGEPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspecti_*")  2>/dev/null | sort -u)}
+  if [[ -z ${IMAGEPATH} ]]
+  then
+    echo -e "ERR: Unable to find any crictl_inspecti_\* file in the crio folder: ${IMAGEPATH}\nPlease check the content of the sosreport\n" && exit 8
+  fi
+  if [[ -z ${CONTAINERPATH} ]]
+  then
+    echo -e "WARN: container inspect files are missing. Unable to correlate the image size with the container name and ids"
+  fi
+  IMAGE_JSON="[]"
+  CONTAINER_LIST=$(jq -r '.status | { "name": .metadata.name, "id": .id, "imageId": .imageId}' $(file ${CONTAINERPATH}/crictl_inspect_* | grep -E "JSON data" | cut -d':' -f1))
+  for imagefile in $(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+  do
+    IMAGE_STATUS=$(jq -r '.status | {size,id,repoTags,repoDigests}' ${imagefile} 2>/dev/null)
+    IMAGE_ID=$(echo ${IMAGE_STATUS} | jq -r '.id')
+    CONTAINER_MATCH=$(echo ${CONTAINER_LIST} | jq -r --arg imageid ${IMAGE_ID} 'select(.imageId == $imageid) | {name: .name, id: .id[0:13]}' | jq -s)
+    IMAGE_JSON=$(echo ${IMAGE_JSON} | jq -rc --argjson image_status "${IMAGE_STATUS}" --argjson container_list "${CONTAINER_MATCH}" '. + [ {"status": $image_status, "containers": $container_list} ]')
+  done
+  echo ${IMAGE_JSON} | jq -rc '"size (MB)|id|repoTags|repoDigests|containers\n---------|--|--------|-----------|----------",(sort_by(-(.status.size | tonumber)) | .[] | "\(.status|"\((.size | tonumber) *100 /1024 /1024 | round/100)|\(.id)|\(.repoTags)|\(.repoDigests)")|\(.containers)")' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/^\([0-9]\{4,10\}\.*[0-9]*\)/${redtext}\1${resetcolor}/" -e "s/^\([4-9][0-9]\{2\}\.*[0-9]*\)/${yellowtext}\1${resetcolor}/"
+}
+
 ##### Main
 
 # Set a default STD_ERR, which can be replaced for debugging to "/dev/stderr"
@@ -311,7 +335,7 @@ then
     fct_help && exit 1
   fi
   OPTNUM=0
-  while getopts :i:I:p:c:g:n:o:P:u:s:S:hv arg; do
+  while getopts :i:I:p:c:Dg:n:o:P:u:s:S:hv arg; do
   case $arg in
       i)
         PODID=${OPTARG}
@@ -332,6 +356,10 @@ then
         CONTAINERNAME=${OPTARG}
         OPTNUM=$[OPTNUM + 1]
         PODFILTER="CONTAINER"
+        ;;
+      D)
+        DISKPRESSURE=true
+        OPTNUM=$[OPTNUM + 1]
         ;;
       g)
         CGROUP=${OPTARG}
@@ -474,6 +502,12 @@ PSAUXWWWM="${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm"
 PS_GROUP="${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup"
 
 clear
+
+if [[ ! -z ${DISKPRESSURE} ]]
+then
+  fct_image_size
+  exit 0
+fi
 
 if [[ ${OPTNUM} == 0 ]]
 then

@@ -49,10 +49,16 @@ sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
     sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
     ```
 
-* Or the following command to display sort the containers by the desired statistic
+* Or the following command to sort the containers by the desired statistic
 
     ```bash
     sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h]
+    ```
+
+* Or the following command to sort the images by the size (diskPressure troubleshooting)
+
+    ```bash
+    sos4ocp.sh [-s <SOSREPORT_PATH>] -D [-h]
     ```
 
 _Notes:_
@@ -70,7 +76,7 @@ using the `-h` option will display the help and provide the list of the availabl
 
 ```text
 usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> [-h|-v]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D [-h|-v]
 
 if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
 
@@ -88,6 +94,7 @@ if none of the filtering parameters is used, the script will display a menu with
 |      -P | Process ID (PID) of a process attached to a Container                          | null                 |
 |      -u | storage UID attached to a POD                                                  | null                 |
 |      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]       | null                 |
+|      -D | List the image size to help troubleshoot diskPressure conditions               | null                 |
 |---------|--------------------------------------------------------------------------------|----------------------|
 |         | Examples:                                                                      |                      |
 |         |  - CGROUP for POD:        kubepods-burstable-pod<ID>                           |                      |
