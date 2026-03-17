@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.3.1
+
+### Minor updates - 1.3.1
+
+- None
+
+### Release updates - 1.3.1
+
+- Adding a Sum for the '-S' and '-D' options as requested in RFE #39
+- Make all ERR messages red, and all WARN messages yellow
+
+--------
+
 ## Version 1.3.0
 
 ### Minor updates - 1.3.0

@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.3.0
+# @VERSION     # 1.3.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -110,7 +110,7 @@ fct_inspect(){
   FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)
   if [[ -z ${FILENAME} ]]
   then
-    echo -e "\nWARN: Unable to locate a ${1} file in the matching the PATH: ${FILEPATH}*"
+    echo -e "\n${yellowtext}WARN: Unable to locate a ${1} file in the matching the PATH: ${FILEPATH}*${resetcolor}"
   else
     FCT_CMD="less ${FILENAME}"
     echo -e "\n${FCT_CMD}"
@@ -242,17 +242,17 @@ fct_check_proc_files(){
   WARN=0
   if [[ ! -f ${PS_GROUP} ]]
   then
-    echo "WARN: File ${PS_GROUP} is missing" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+    echo "${yellowtext}WARN: File ${PS_GROUP} is missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
     WARN=$[WARN + 1]
   fi
   if [[ ! -f ${PSFAUXWWW} ]]
   then
     if [[ ! -f ${PSAUXWWWM} ]]
     then
-      echo "WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo "${yellowtext}WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       WARN=$[WARN + 1]
     else
-      echo "INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo "${yellowtext}INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       PSFAUXWWW=${PSAUXWWWM}
     fi
   fi
@@ -267,7 +267,7 @@ fct_container_processes(){
   echo
   if [[ -z ${FILENAME} ]]
   then
-    echo "WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*"
+    echo "${yellowtext}WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*${resetcolor}"
   else
     Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
     fct_check_proc_files
@@ -278,7 +278,7 @@ fct_container_processes(){
       PROCESS_LIST="$(grep ${Container_cgroup} ${PS_GROUP} 2>/dev/null| awk '{printf "|^[a-zA-Z0-9+ ]*"$1"|^[a-zA-Z0-9+ ]*"$2}')"
       grep -E "^USER${PROCESS_LIST}" ${PSFAUXWWW} | less
     else
-      echo "ERR: Unable to retrieve the cgroup and/or PID as some files are missing."
+      echo "${redtext}ERR: Unable to retrieve the cgroup and/or PID as some files are missing.${resetcolor}"
     fi
   fi
 }
@@ -288,11 +288,11 @@ fct_image_size(){
   IMAGEPATH=${IMAGEPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspecti_*")  2>/dev/null | sort -u)}
   if [[ -z ${IMAGEPATH} ]]
   then
-    echo -e "ERR: Unable to find any crictl_inspecti_\* file in the crio folder: ${IMAGEPATH}\nPlease check the content of the sosreport\n" && exit 8
+    echo -e "${redtext}ERR: Unable to find any crictl_inspecti_\* file in the crio folder: ${IMAGEPATH}\nPlease check the content of the sosreport${resetcolor}\n" && exit 8
   fi
   if [[ -z ${CONTAINERPATH} ]]
   then
-    echo -e "WARN: container inspect files are missing. Unable to correlate the image size with the container name and ids"
+    echo -e "${yellowtext}WARN: container inspect files are missing. Unable to correlate the image size with the container name and ids${resetcolor}"
   fi
   IMAGE_JSON="[]"
   CONTAINER_LIST=$(jq -r '.status | { "name": .metadata.name, "id": .id, "imageId": .imageId}' $(file ${CONTAINERPATH}/crictl_inspect_* | grep -E "JSON data" | cut -d':' -f1))
@@ -303,7 +303,10 @@ fct_image_size(){
     CONTAINER_MATCH=$(echo ${CONTAINER_LIST} | jq -r --arg imageid ${IMAGE_ID} 'select(.imageId == $imageid) | {name: .name, id: .id[0:13]}' | jq -s)
     IMAGE_JSON=$(echo ${IMAGE_JSON} | jq -rc --argjson image_status "${IMAGE_STATUS}" --argjson container_list "${CONTAINER_MATCH}" '. + [ {"status": $image_status, "containers": $container_list} ]')
   done
-  echo ${IMAGE_JSON} | jq -rc '"size (MB)|id|repoTags|repoDigests|containers\n---------|--|--------|-----------|----------",(sort_by(-(.status.size | tonumber)) | .[] | "\(.status|"\((.size | tonumber) *100 /1024 /1024 | round/100)|\(.id)|\(.repoTags)|\(.repoDigests)")|\(.containers)")' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/^\([0-9]\{4,10\}\.*[0-9]*\)/${redtext}\1${resetcolor}/" -e "s/^\([4-9][0-9]\{2\}\.*[0-9]*\)/${yellowtext}\1${resetcolor}/"
+  echo -e "############################################\n# TOTAL IMAGES SIZE:        $(echo ${IMAGE_JSON} | jq -rc '[.[] | .status.size | tonumber] | add * 100/1024/1024 | round/100') MB"
+  echo -e "# ESTIMATED SPACE USED (1): $(echo ${IMAGE_JSON} | jq -rc '[.[] | (.containers | length) as $container_number | .status.size | tonumber * $container_number] | add * 100/1024/1024 | round/100') MB\n############################################\n"
+  echo ${IMAGE_JSON} | jq -rc '"size (MB)|Nb containers|Estimated space used (MB) (1)|Image id|repoTags|repoDigests|containers\n---------|-------------|------------------------------|--------|--------|-----------|----------",(sort_by(-(.status.size | tonumber)) | .[] | (.containers | length) as $container_number | ((.status.size | tonumber) *100 /1024 /1024 | round/100) as $image_size | "\($image_size)|\($container_number)|\(if($container_number == 0) then $image_size else ($image_size * $container_number * 100 | round/100) end)|\(.status|"\(.id)|\(.repoTags)|\(.repoDigests)")|\(.containers)")' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/^\([0-9]\{4,10\}\.*[0-9]*\)/${redtext}\1${resetcolor}/" -e "s/^\([4-9][0-9]\{2\}\.*[0-9]*\)/${yellowtext}\1${resetcolor}/"
+  echo -e "\n${yellowtext}Note:\n(1) - \"Estimated space used (MB)\" is calculated as the image size multiplied by the number of containers using the image. It is important to note that this is a theoretical value and may not reflect the actual disk space used due to factors such as shared layers between images, copy-on-write storage, and other optimizations used by container runtimes.${resetcolor}"
 }
 
 ##### Main
@@ -420,7 +423,7 @@ then
             SORTFILTER='n'
             ;;
           *)
-            echo "Err: invalid sorting key '${SORT_KEY}' for the container statistic"
+            echo "${redtext}Err: invalid sorting key '${SORT_KEY}' for the container statistic${resetcolor}"
             fct_help && exit 1
             ;;
         esac
@@ -460,7 +463,7 @@ then
   then
     SOSREPORT_PATH=$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)
   else
-    echo "Err: Unable to find the 'crio' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}"
+    echo "${redtext}Err: Unable to find the 'crio' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}${resetcolor}"
     fct_help && exit 5
   fi
 fi
@@ -490,9 +493,9 @@ if [[ ! -f ${CRIO_PATH}/crictl_pods ]] || [[ ! -f ${CRIO_PATH}/crictl_ps_-a ]]
 then
   if [[ -f ${CRIO_PATH}/systemctl_status_crio ]]
   then
-    echo -e "Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' are missing. Please check the logs from ${CRIO_PATH}/systemctl_status_crio\n"
+    echo -e "${redtext}Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' are missing. Please check the logs from ${CRIO_PATH}/systemctl_status_crio\n${resetcolor}"
   else
-    echo -e "Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' and the 'systemctl_status_crio' are missing. Please check the content of the sosreport\n"
+    echo -e "${redtext}Err: The crictl output 'crictl_pods' and/or 'crictl_ps_-a' and the 'systemctl_status_crio' are missing. Please check the content of the sosreport\n${resetcolor}"
   fi
   fct_help && exit 6
 fi
@@ -545,12 +548,12 @@ else
             CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
           fi
         else
-          echo "WARN: Unable to proceed with the PODs' statistics"
+          echo "${yellowtext}WARN: Unable to proceed with the PODs' statistics${resetcolor}"
           if [[ ! -f ${CRIO_PATH}/crictl_stats ]]
           then
-            echo -e "ERR: Unable to find the stats file: ${CRIO_PATH}/crictl_stats\n" && fct_help && exit 7
+            echo -e "${redtext}ERR: Unable to find the stats file: ${CRIO_PATH}/crictl_stats\n${resetcolor}" && fct_help && exit 7
           else
-            echo -e "ERR: Fatal error detected in the stats file: ${CRIO_PATH}/crictl_stats\n" && fct_help && exit 8
+            echo -e "${redtext}ERR: Fatal error detected in the stats file: ${CRIO_PATH}/crictl_stats\n${resetcolor}" && fct_help && exit 8
           fi
         fi
         ;;
@@ -574,7 +577,7 @@ else
             fct_cgroup
           fi
         else
-          echo "ERR: Unable to retrieve the Process ID details as the process files are missing."
+          echo "${redtext}ERR: Unable to retrieve the Process ID details as the process files are missing.${resetcolor}"
         fi
         echo -e "List of PODs including the PROC_PID: ${PROC_PID}\n"
         ;;
@@ -634,12 +637,14 @@ if [[ ${PODFILTER} == "STATISTIC" ]]
 then
   NUM=0
   OPTION_NUM=$(echo ${#CONTAINER_IDS[@]})
-  echo -e "POD ID|POD NAME|CONTAINER ID|CONTAINER NAME|STATE|CREATED|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|---------|------------|--------------|-----|-------|-------|-------------|---------|----------|------|\n$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
+  CONTAINERS_STAT_LIST=$(while [[ ${NUM} -lt ${OPTION_NUM} ]]
   do
     CONTAINER_ID=$(echo ${CONTAINER_IDS[${NUM}]} | cut -d'|' -f3)
     echo "$(echo ${CONTAINER_IDS[${NUM}]} | cut -d',' -f1)|$(fct_container_statistic ${CONTAINER_ID})" | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/"
     NUM=$[NUM+1]
-  done | sort -${SORTFILTER}r -t'|' -k${SORT_VALUE})" | column -t -s'|'
+  done | sort -${SORTFILTER}r -t'|' -k${SORT_VALUE})
+  SUM_STATS=$(awk 'BEGIN{sum_cpu=0;sum_mem=0;sum_disk=0;sum_inode=0} {sum_cpu+=$3;mem_value=substr($4,1,length($4)-1);mem_unit=substr($4,length($4)-1);if(mem_unit=="GB"){sum_mem+=(mem_value * 1024)} else if(mem_unit=="TB"){sum_mem+=(mem_value * 1024 * 1024)} else if((mem_unit=="kB")||(mem_unit=="KB")){sum_mem+=(mem_value / 1024)} else {sum_mem+=mem_value};disk_value=substr($5,1,length($5)-1);disk_unit=substr($5,length($5)-1);if(disk_unit=="GB"){sum_disk+=(disk_value * 1024)} else if(disk_unit=="TB"){sum_disk+=(disk_value * 1024 * 1024)} else if((disk_unit=="kB") || (disk_unit=="KB")){sum_disk+=(disk_value / 1024)} else {sum_disk+=disk_value};sum_inode+=$NF} END{print sum_cpu"|"sum_mem" MB|"sum_disk" MB|"sum_inode}' ${CRIO_PATH}/crictl_stats)
+  echo -e " | | | | | |TOTAL|${SUM_STATS}\n | | | | | |-------|-------------|---------|----------|------|\nPOD ID|POD NAME|CONTAINER ID|CONTAINER NAME|STATE|CREATED|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|---------|------------|--------------|-----|-------|-------|-------------|---------|----------|------|\n${CONTAINERS_STAT_LIST}" | column -t -s'|'
 else
   # Create the List of option  for the Menu
   CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
