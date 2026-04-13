@@ -12,16 +12,16 @@ None
 
 * pull the repository
 
-```text
-git clone https://github.com/vlours/sos4ocp
-```
+  ```bash
+  git clone https://github.com/vlours/sos4ocp
+  ```
 
 * Create the alias `sos4ocp` for `sos4ocp.sh` in your .bashrc profile (_optional_)
 
-```bash
-echo -e "\nalias sos4ocp=${PWD}/sos4ocp/sos4ocp.sh" >> ${HOME}/.bashrc
-source ${HOME}/.bashrc
-```
+  ```bash
+  echo -e "\nalias sos4ocp=${PWD}/sos4ocp/sos4ocp.sh" >> ${HOME}/.bashrc
+  source ${HOME}/.bashrc
+  ```
 
 ### Update to latest version (_based on the alias_)
 
@@ -35,7 +35,7 @@ sos4ocp_dir=$(dirname $(alias sos4ocp | cut -d"'" -f2)); cd ${sos4ocp_dir}; git 
 
 ```bash
 sos4ocp_dir=$(dirname $(alias mg_check | cut -d"'" -f2))
-if [[ -d ${sos4ocp_dir} ]]; then rm ${sos4ocp_dir}; fi
+if [[ -d ${sos4ocp_dir} ]]; then rm -rf ${sos4ocp_dir}; fi
 sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 ```
 
@@ -75,36 +75,51 @@ _Notes:_
 using the `-h` option will display the help and provide the list of the available options, and the version of the script.
 
 ```text
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
-usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D [-h|-v]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-m <imageID>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] [-h|-v]
+usage: sos4ocp.sh [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D <sum|both|layers> [-h|-v]
 
 if none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.
 
-|-----------------------------------------------------------------------------------------------------------------|
-| Options | Description                                                                    | [Default]            |
-|---------|--------------------------------------------------------------------------------|----------------------|
-|      -s | Path to access the SOSREPORT base folder                                       | <Current folder> [.] |
-|      -p | Name of the POD                                                                | null                 |
-|      -i | UID of the POD                                                                 | null                 |
-|      -I | UID of the container                                                           | null                 |
-|      -c | Name of a CONTAINER                                                            | null                 |
-|      -n | NAMESPACE related to PODs                                                      | null                 |
-|      -g | CGROUP attached to a POD or Container                                          | null                 |
-|      -o | Storage OVERLAY ID attached to a Container                                     | null                 |
-|      -P | Process ID (PID) of a process attached to a Container                          | null                 |
-|      -u | storage UID attached to a POD                                                  | null                 |
-|      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]       | null                 |
-|      -D | List the image size to help troubleshoot diskPressure conditions               | null                 |
-|---------|--------------------------------------------------------------------------------|----------------------|
-|         | Examples:                                                                      |                      |
-|         |  - CGROUP for POD:        kubepods-burstable-pod<ID>                           |                      |
-|         |  - CGROUP for Container:  crio-<ID>                                            |                      |
-|         |  - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged |                      |
-|         |  - POD_UID from storage:  /var/lib/kubelet/pods/<POD_UID>/                     |                      |
-|---------|--------------------------------------------------------------------------------|----------------------|
-|         | Additional Options:                                                            |                      |
-|---------|--------------------------------------------------------------------------------|----------------------|
-|      -h | display this helpn                                                             |                      |
-|      -v | display the version and check for updates                                      |                      |
-|-----------------------------------------------------------------------------------------------------------------|
+|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Options | Description                                                                                                         | [Default]            |
+|---------|---------------------------------------------------------------------------------------------------------------------|----------------------|
+|      -s | Path to access the SOSREPORT base folder                                                                            | <Current folder> [.] |
+|      -p | Name of the POD                                                                                                     | null                 |
+|      -i | UID of the POD                                                                                                      | null                 |
+|      -I | UID of the container                                                                                                | null                 |
+|      -c | Name of a CONTAINER                                                                                                 | null                 |
+|      -n | NAMESPACE related to PODs                                                                                           | null                 |
+|      -g | CGROUP attached to a POD or Container                                                                               | null                 |
+|      -o | Storage OVERLAY ID attached to a Container                                                                          | null                 |
+|      -m | Image ID attached to a Container (can also be used as a filter with -D option)                                      | null                 |
+|      -P | Process ID (PID) of a process attached to a Container                                                               | null                 |
+|      -u | storage UID attached to a POD                                                                                       | null                 |
+|      -S | Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]                                            | null                 |
+|      -D | Display the image sizes (<sum>), layers details (<layers>) or <both>, to help troubleshoot diskPressure conditions  | null                 |
+|---------|---------------------------------------------------------------------------------------------------------------------|----------------------|
+|         | Examples:                                                                                                           |                      |
+|         |  - CGROUP for POD:        kubepods-burstable-pod<ID>                                                                |                      |
+|         |  - CGROUP for Container:  crio-<ID>                                                                                 |                      |
+|         |  - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged                                      |                      |
+|         |  - POD_UID from storage:  /var/lib/kubelet/pods/<POD_UID>/                                                          |                      |
+|---------|---------------------------------------------------------------------------------------------------------------------|----------------------|
+|         | Additional Options:                                                                                                 |                      |
+|---------|---------------------------------------------------------------------------------------------------------------------|----------------------|
+|      -h | display this helpn                                                                                                  |                      |
+|      -v | display the version and check for updates                                                                           |                      |
+|------------------------------------------------------------------------------------------------------------------------------------------------------|
 ```
+
+### Improvements
+
+#### Disk Pressure - image details
+
+* from version 1.4.0, the disk pressure has been split in 3 views (`sum`, `layers`, `both`):
+  * `sum`: will display a summarize version of the image usage (size, nb layers, nb containers)
+  * `layers`: will display a more verbose of the images, layers, and containers.
+  * `both`: will display the 2 previous view in sequence.
+
+It's also possible to use the `-m` option to display the image layers for a single image, when using the `-D` option.
+
+_Note: The file `/var/lib/containers/storage/overlay-layers/layers.json` will be included in the SOSREPORT plugins after the PR `#4284` will be merged.
+It's possible to request the customer to collect the file and then include it in the SOSREPORT archive in the folder `<sosreport>//var/lib/containers/storage/overlay-layers/`_

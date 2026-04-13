@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.3.1
+# @VERSION     # 1.4.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -16,11 +16,11 @@ fct_help(){
   then
     ScriptName=$(basename $0)
   fi
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] ${purpletext}[-h|-v]${resetcolor}"
-  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D ${purpletext}[-h|-v]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] [-p <PODNAME>|-i <PODID>|-I <containerID>|-c <CONTAINER_NAME>|-m <imageID>|-n <NAMESPACE>|-g <CGROUP>|-o <CONTAINER_OVERLAY>|-P <PROCESS_ID>|-u <POD_UID>] ${purpletext}[-h|-v]${resetcolor}"
+  echo -e "usage: ${cyantext}${ScriptName} [-s <SOSREPORT_PATH>] -S <name|cpu|mem|disk|inodes|state|attempt> | -D <sum|both|layers> ${purpletext}[-h|-v]${resetcolor}"
   echo -e "\nif none of the filtering parameters is used, the script will display a menu with a list of the available PODs from the sosreport.\n"
   OPTION_TAB=8
-  DESCR_TAB=78
+  DESCR_TAB=115
   DEFAULT_TAB=21
   printf "|%${OPTION_TAB}s---%-${DESCR_TAB}s---%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "Options" "Description" "[Default]"
@@ -33,10 +33,11 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD or Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-o" "Storage OVERLAY ID attached to a Container" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-m" "Image ID attached to a Container (can also be used as a filter with -D option)" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-P" "Process ID (PID) of a process attached to a Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-u" "storage UID attached to a POD" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-S" "Display all containers stats by [name,cpu,mem,disk,inodes,state,attempt]" "null"
-  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-D" "List the image size to help troubleshoot diskPressure conditions" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-D" "Display the image sizes (<sum>), layers details (<layers>) or <both>, to help troubleshoot diskPressure conditions" "null"
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Examples:" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for POD:        kubepods-burstable-pod<ID>" ""
@@ -134,7 +135,7 @@ do
   do
     echo "[$[NUM+1]]|$(echo ${LIST_OPTION[${NUM}]} | cut -d',' -f1)"
     NUM=$[NUM+1]
-  done)\n[q]|Quit" | column -t -s'|'
+  done)\n[q]|Quit" | column -ts'|' | sed -e "s/Inspect POD:.*/${purpletext}&${resetcolor}/" -e "s/Inspect Container:.*/${cyantext}&${resetcolor}/" -e "s/Display Container log:.*/${greentext}&${resetcolor}/" -e "s/Display Container proc:.*/${yellowtext}&${resetcolor}/"
   printf "Choice: "
   read REP
   if ([[ ${REP} != [qQ] ]] && (! [[ ${REP} =~ ^[0-9]+$ ]])) || ([[ ${REP} =~ ^[0-9]+$ ]] && ([[ ${REP} -gt ${OPTION_NUM} ]] || [[ ${REP} -le 0 ]]))
@@ -164,7 +165,7 @@ fi
 while ([[ ${REP} != [qQ] ]] &&  [[ ${PODID} == "null" ]])
 do
   NUM=0
-  echo -e ",POD_ID,POD_NAME,NAMESPACE\n$(while [[ ${NUM} -lt ${POD_NUM} ]]
+  echo -e " ,POD_ID,POD_NAME,NAMESPACE,STATE\n$(while [[ ${NUM} -lt ${POD_NUM} ]]
   do
     echo "[$[NUM+1]],$(echo ${POD_LIST[${NUM}]})"
     NUM=$[NUM+1]
@@ -188,27 +189,13 @@ done
 
 # Extract POD reference from container ID
 fct_extract_from_container_id(){
-if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "ID" ]]
-then
-  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$NF}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
-else
-  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} '{if($1 == containerid){printf "%s ",$(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
-fi
+  POD_IDS_LIST=($(awk -v containerid=${CONTAINERID} -v position=${PODID_POSITION} '{if($1 == containerid){print $(NF-position)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$0}'))
 }
 
 # Collect the containers details
 fct_container_details(){
-CONTAINER_DETAILS=${CONTAINER_DETAILS:-$(awk -v podid=${PODID} '{if($(NF-1) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
-if [[ -z ${CONTAINER_DETAILS} ]]
-then
-  CONTAINER_DETAILS=$(awk -v podid=${PODID} '{if($(NF) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
-  CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-2)}'))
-else
-  if [[ -z ${CONTAINER_IDS} ]]
-  then
-    CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s,%s ",$1,$(NF-3)}'))
-  fi
-fi
+CONTAINER_DETAILS=$(awk -v podid=${PODID} -v position=${PODID_POSITION} '{if($(NF-position) == podid){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
+CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk -v position=${PODID_POSITION} '{printf "%s,%s,%s ",$1,$(NF-position-2),$2}'))
 }
 
 #Retrieve container statistic
@@ -229,6 +216,10 @@ fct_container_statistic(){
 
 #Retrieve POD list based on CGROUP
 fct_cgroup(){
+  if [[ ! -d ${PODPATH} ]]
+  then
+    echo -e "${redtext}ERR: The <$PODPATH> does not exist and is required for this option\nPlease check the content of the sosreport${resetcolor}" && fct_help && exit 9
+  fi
   POD_IDS_LIST=($(jq -r --arg cgroup "${CGROUP}" '.? | select(.info.runtimeSpec.linux.cgroupsPath | test($cgroup)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
   if [[ -z ${POD_IDS_LIST} ]]
   then
@@ -242,17 +233,17 @@ fct_check_proc_files(){
   WARN=0
   if [[ ! -f ${PS_GROUP} ]]
   then
-    echo "${yellowtext}WARN: File ${PS_GROUP} is missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+    echo -e "${yellowtext}WARN: File ${PS_GROUP} is missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
     WARN=$[WARN + 1]
   fi
   if [[ ! -f ${PSFAUXWWW} ]]
   then
     if [[ ! -f ${PSAUXWWWM} ]]
     then
-      echo "${yellowtext}WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo -e "${yellowtext}WARN: Files ${PSFAUXWWW} and ${PSAUXWWWM} are missing${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       WARN=$[WARN + 1]
     else
-      echo "${yellowtext}INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
+      echo -e "${yellowtext}INFO: File ${PSFAUXWWW} is missing, using file ${PSAUXWWWM} instead${resetcolor}" | sed -e "s#[-0-9a-zA-Z._/()]*\(sos_commands/process/[a-z\-_]*\)#\${SOSREPORT_PATH}/\1#g"
       PSFAUXWWW=${PSAUXWWWM}
     fi
   fi
@@ -267,7 +258,7 @@ fct_container_processes(){
   echo
   if [[ -z ${FILENAME} ]]
   then
-    echo "${yellowtext}WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*${resetcolor}"
+    echo -e "${yellowtext}WARN: Unable to locate a inspect file in the matching the PATH: ${FILEPATH}*${resetcolor}"
   else
     Container_cgroup=$(jq -r '.info.runtimeSpec.linux.cgroupsPath' ${FILENAME} | sed -e "s/:crio:/\/crio-/")
     fct_check_proc_files
@@ -278,35 +269,112 @@ fct_container_processes(){
       PROCESS_LIST="$(grep ${Container_cgroup} ${PS_GROUP} 2>/dev/null| awk '{printf "|^[a-zA-Z0-9+ ]*"$1"|^[a-zA-Z0-9+ ]*"$2}')"
       grep -E "^USER${PROCESS_LIST}" ${PSFAUXWWW} | less
     else
-      echo "${redtext}ERR: Unable to retrieve the cgroup and/or PID as some files are missing.${resetcolor}"
+      echo -e "${redtext}ERR: Unable to retrieve the cgroup and/or PID as some files are missing.${resetcolor}"
     fi
   fi
 }
 
-# Image Size to help troubleshoot diskPressure conditions
-fct_image_size(){
-  IMAGEPATH=${IMAGEPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspecti_*")  2>/dev/null | sort -u)}
-  if [[ -z ${IMAGEPATH} ]]
-  then
-    echo -e "${redtext}ERR: Unable to find any crictl_inspecti_\* file in the crio folder: ${IMAGEPATH}\nPlease check the content of the sosreport${resetcolor}\n" && exit 8
-  fi
-  if [[ -z ${CONTAINERPATH} ]]
-  then
-    echo -e "${yellowtext}WARN: container inspect files are missing. Unable to correlate the image size with the container name and ids${resetcolor}"
-  fi
+# Retrieve Image Sizes to help troubleshoot diskPressure conditions - if possible based on correlating the overlay layers with the container names and ids
+fct_image_size_overlay()
+{
   IMAGE_JSON="[]"
-  CONTAINER_LIST=$(jq -r '.status | { "name": .metadata.name, "id": .id, "imageId": .imageId}' $(file ${CONTAINERPATH}/crictl_inspect_* | grep -E "JSON data" | cut -d':' -f1))
-  for imagefile in $(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+  CONTAINER_LIST="[]"
+  CONTAINER_FILE_LIST=$(file ${CONTAINERPATH}/crictl_inspect_* | grep -E "JSON data" | cut -d':' -f1)
+  NBFILE=$(echo ${CONTAINER_FILE_LIST} | wc -w)
+  Count=1
+  for containerfile in ${CONTAINER_FILE_LIST}
   do
+    if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
+    then
+      printf "\rProcessing container file: %d/%d" $Count $NBFILE
+      ((Count++))
+    fi
+    #The Image reference in latest version is available in .status.imageId, but in older version it is only available in .info.runtimeSpec.annotations."io.kubernetes.cri-o.ImageRef", so we need to check both
+    CONTAINER_DETAILS=$(jq -r '{ "name": .status.metadata.name, "id": .status.id, "imageId": (if (.status.imageId == null) then .info.runtimeSpec.annotations."io.kubernetes.cri-o.ImageRef" else .status.imageId end), "namespace": .status.labels."io.kubernetes.pod.namespace", "podname": .status.labels."io.kubernetes.pod.name", "state": .status.state, "layerID": (.info.runtimeSpec.root.path | split("/") | .[6])}' ${containerfile})
+    CONTAINER_LIST=$( echo ${CONTAINER_LIST} | jq -rc --argjson container_details "${CONTAINER_DETAILS}" '. + [ $container_details ]')
+  done
+  SHARED_LAYERS=$(jq -rs '.[].info.imageSpec.rootfs."diff_ids"[]' $(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1) | sort | uniq -c | sort -n | grep -Ev "^ *1 sha256" | awk 'BEGIN{printf"["}{printf "{\"%s\":{\"count\":%d}},",$2,$1}END{printf"]\n"}' | sed -e "s/,\]/\]/")
+  # Calculate the replicate space used by each shared layer
+  SHARED_LAYER_JSON="[]"
+  for sha256_layer in $(echo ${SHARED_LAYERS} | jq -r '.[] | keys[]')
+  do
+    if [[ -f ${OVERLAY_LAYERS_FILE} ]]
+    then
+      SHARED_LAYER_DETAILS=$(jq -r --arg layer "${sha256_layer}" --argjson sharedlayers ${SHARED_LAYERS} '.[] | select(."diff-digest" == $layer) | {"diff-digest",id,parent,"diff-size","count":($sharedlayers[]? | to_entries[] | select(.key == $layer) | .value.count)}' ${OVERLAY_LAYERS_FILE})
+    else
+      SHARED_LAYER_DETAILS=$(jq -n --arg layer "${sha256_layer}" --argjson sharedlayers ${SHARED_LAYERS} '{"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "count": ($sharedlayers[]? | to_entries[] | select(.key == $layer) | .value.count)}')
+    fi
+    SHARED_LAYER_JSON=$(echo ${SHARED_LAYER_JSON} | jq -rc --argjson layer_details "${SHARED_LAYER_DETAILS}" '. + [ $layer_details ]')
+  done
+  if [[ -z ${IMAGEID} ]]
+  then
+    IMAGE_FILE_LIST=$(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+  else
+    IMAGE_FILE_LIST=$(file ${IMAGEPATH}/crictl_inspecti_${IMAGEID}* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+  fi
+  if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
+  then
+      echo
+      NBFILE=$(echo ${IMAGE_FILE_LIST} | wc -w)
+      Count=1
+  fi
+  # Create JSON data with the image details, the list of containers using this image and the layer details (size, shared or not)
+  for imagefile in ${IMAGE_FILE_LIST}
+  do
+    if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
+    then
+      printf "\rProcessing image file: %d/%d" $Count $NBFILE
+      ((Count++))
+    fi
     IMAGE_STATUS=$(jq -r '.status | {size,id,repoTags,repoDigests}' ${imagefile} 2>/dev/null)
     IMAGE_ID=$(echo ${IMAGE_STATUS} | jq -r '.id')
-    CONTAINER_MATCH=$(echo ${CONTAINER_LIST} | jq -r --arg imageid ${IMAGE_ID} 'select(.imageId == $imageid) | {name: .name, id: .id[0:13]}' | jq -s)
-    IMAGE_JSON=$(echo ${IMAGE_JSON} | jq -rc --argjson image_status "${IMAGE_STATUS}" --argjson container_list "${CONTAINER_MATCH}" '. + [ {"status": $image_status, "containers": $container_list} ]')
+    SHA256_IMAGE_LAYERS=$(jq -r '.info.imageSpec.rootfs."diff_ids"[]' ${imagefile} 2>/dev/null)
+    LAYER_JSON="[]"
+    for sha256_layer in ${SHA256_IMAGE_LAYERS}
+    do
+      SHARED_LAYER_BOOL=$(echo ${SHARED_LAYERS} | jq -r --arg layer "${sha256_layer}" '(.[] | to_entries[] | select(.key == $layer)| if (.key == $layer) then true else $layer end) // false')
+      if [[ -f ${OVERLAY_LAYERS_FILE} ]]
+      then
+        LAYER_DETAILS=$(jq -r --arg layer "${sha256_layer}" --arg shared ${SHARED_LAYER_BOOL} '.[] | select(."diff-digest" == $layer) | {"diff-digest",id,parent,"diff-size","shared":$shared}' ${OVERLAY_LAYERS_FILE})
+      else
+        LAYER_DETAILS=$(jq -n --arg layer "${sha256_layer}" --arg shared ${SHARED_LAYER_BOOL} '{"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "shared": $shared}')
+      fi
+      LAYER_JSON=$(echo ${LAYER_JSON} | jq -rc --argjson layer_details "${LAYER_DETAILS}" '. + [ $layer_details ]')
+    done
+    CONTAINER_MATCH=$(echo ${CONTAINER_LIST} | jq -r --arg imageid ${IMAGE_ID} '.[] | select(.imageId == $imageid) | {name, id: .id[0:13], layerID, state, namespace, podname}' | jq -s)
+    IMAGE_JSON=$(echo ${IMAGE_JSON} | jq -rc --argjson image_status "${IMAGE_STATUS}" --argjson containers "${CONTAINER_MATCH}" --argjson layer_json "${LAYER_JSON}" '. + [ {"status": $image_status, "containers": $containers, "layers": $layer_json} ]')
   done
-  echo -e "############################################\n# TOTAL IMAGES SIZE:        $(echo ${IMAGE_JSON} | jq -rc '[.[] | .status.size | tonumber] | add * 100/1024/1024 | round/100') MB"
-  echo -e "# ESTIMATED SPACE USED (1): $(echo ${IMAGE_JSON} | jq -rc '[.[] | (.containers | length) as $container_number | if ($container_number > 0) then .status.size | tonumber * $container_number else .status.size | tonumber end] | add * 100/1024/1024 | round/100') MB\n############################################\n"
-  echo ${IMAGE_JSON} | jq -rc '"size (MB)|Nb containers|Estimated space used (MB) (1)|Image id|repoTags|repoDigests|containers\n---------|-------------|------------------------------|--------|--------|-----------|----------",(sort_by(-(.status.size | tonumber)) | .[] | (.containers | length) as $container_number | ((.status.size | tonumber) *100 /1024 /1024 | round/100) as $image_size | "\($image_size)|\($container_number)|\(if($container_number == 0) then $image_size else ($image_size * $container_number * 100 | round/100) end)|\(.status|"\(.id)|\(.repoTags)|\(.repoDigests)")|\(.containers)")' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/^\([0-9]\{4,10\}\.*[0-9]*\)/${redtext}\1${resetcolor}/" -e "s/^\([4-9][0-9]\{2\}\.*[0-9]*\)/${yellowtext}\1${resetcolor}/"
-  echo -e "\n${yellowtext}Note:\n(1) - \"Estimated space used (MB)\" is calculated as the image size multiplied by the number of containers using the image. It is important to note that this is a theoretical value and may not reflect the actual disk space used due to factors such as shared layers between images, copy-on-write storage, and other optimizations used by container runtimes.${resetcolor}"
+  echo
+  clear
+
+  if [[ -z ${IMAGEID} ]]
+  then
+    echo -e "############################################"
+    echo ${IMAGE_JSON} | jq -rc --argjson containers "${CONTAINER_LIST}" --argjson sharedlayerjson ${SHARED_LAYER_JSON} '(. | length) as $nbimages | ($containers | length) as $nbcontainers | ([.[] | .status.size | tonumber] | add * 100/1024/1024 | round/100) as $total | ([$sharedlayerjson | .[]? | ((."diff-size" // 0) | tonumber) * (((.count // 1) | tonumber) -1) ] | add * 100/1024/1024 | round/100) as $duplicshared | "# Number of Images:|\($nbimages)\n# Number of Containers:|\($nbcontainers)\n#########################\n# TOTAL IMAGE SIZE:|\($total) MB\n# DUPLICATE SHARED SPACE:|\(if($duplicshared > 0) then "-\($duplicshared) MB" else "Unknown" end)\n# USED SPACE ON DISK:|\(if($duplicshared > 0) then "\(($total - $duplicshared) * 100 | round /100) MB" else "Unknown" end)"' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/\(DUPLICATE SHARED SPACE: *\)\([0-9.-]*\) MB/\1${cyantext}\2${resetcolor} MB/" -e "s/\(DUPLICATE SHARED SPACE: *\)\([A-Za-z]*\)/\1${cyantext}\2${resetcolor}/" -e "s/\(TOTAL IMAGE SIZE: *\)\([0-9.]*\) MB/\1${yellowtext}\2${resetcolor} MB/" -e "s/\(USED SPACE ON DISK: *\)\([0-9.]*\) MB/\1${greentext}\2${resetcolor} MB/" -e "s/\(USED SPACE ON DISK: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/"
+    echo -e "############################################"
+  fi
+  if [[ ${DISKPRESSURE} == "sum" ]] || [[ ${DISKPRESSURE} == "both" ]]
+  then
+    echo -e "\n############################################\n# IMAGES SUMMARY\n############################################\n"
+    echo -e ${IMAGE_JSON} | jq -r '"Image| |Shared Layers| |Unique Layers| |Containers|\nID|Size|Size|Count|Size|Count|Count|",(sort_by(-(.status.size | tonumber)) | .[] | ((.status.size | tonumber) *100 /1024 /1024 | round/100) as $image_size | (.layers | map(select(.shared == "true"))) as $shared_layer | (.layers | map(select(.shared == "false"))) as $unique_layer | "\(.status.id)|\($image_size) MB|\([ $shared_layer | (.[]?."diff-size" // 0) | tonumber] | add | if(($shared_layer |length > 0) and ((. == 0) or (. == null))) then "Unknown" else if(. == null) then 0 else (. /1024 /1024 * 100 | round/100) end end) MB|(\($shared_layer |length))|\([ $unique_layer | (.[]?."diff-size" // 0) | tonumber] | add | if(($unique_layer |length > 0) and ((. == 0) or (. == null))) then "Unknown" else if(. == null) then 0 else (. /1024 /1024 * 100 | round/100) end end) MB|(\($unique_layer |length))|\(.containers | length)")' | column -ts'|' | sed -e 's/[ ]*$//' -e "s/\([0-9]\{4,10\}\.*[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" -e "s/\([0-9]\{4,10\}\) MB/${redtext}\1${resetcolor} MB/g" -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g" -e "s/\([4-9][0-9]\{2\}\) MB/${yellowtext}\1${resetcolor} MB/g"
+  fi
+  if [[ ${DISKPRESSURE} == "layers" ]] || [[ ${DISKPRESSURE} == "both" ]]
+  then
+    echo -e "\n############################################\n# IMAGE LAYERS DETAILS\n############################################\n"
+    for image in $(echo ${IMAGE_JSON} | jq -r 'sort_by(-(.status.size | tonumber)) | .[] | .status.id')
+    do
+      echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .status | "Image ID: \(.id) - Repotag: \(.repoTags) - Repodigest: \(.repoDigests)"' | sed -e "s/\(Image ID:\)/${greentext}\1${resetcolor}/"
+      echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | ((.status.size | tonumber) *100 /1024 /1024 | round/100) as $image_size | (.layers | map(select(.shared == "true"))) as $shared_layer | (.layers | map(select(.shared == "false"))) as $unique_layer | " |-> Size: \($image_size) MB  / Shared layers: \($shared_layer |length) (\([ $shared_layer | (.[]?."diff-size" // 0) | tonumber] | add | if(($shared_layer |length > 0) and ((. == 0) or (. == null))) then "Unknown" else if(. == null) then 0 else (. /1024 /1024 * 100 | round/100) end end) MB) / Unique layers: \($unique_layer |length) (\([ $unique_layer | (.[]?."diff-size" // 0) | tonumber] | add | if(($unique_layer |length > 0) and ((. == 0) or (. == null))) then "Unknown" else if(. == null) then 0 else (. /1024 /1024 * 100 | round/100) end end) MB)"' | sed -e "s/\([0-9]\{4,10\}\.[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g" -e "s/Unknown/${yellowtext}Unknown${resetcolor}/g"
+      echo -e " |-> ${purpletext}Layers${resetcolor} ($(echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .layers | length'))"
+      echo ${IMAGE_JSON} | jq -r --arg image ${image} '" \\    Sha256#Layer ID#Layer Size#Parent#Shared",(.[] | select(.status.id == $image) | .layers[]? | "  |-> \(."diff-digest")#\(.id)#\(if(."diff-size" != null) then "\(."diff-size"|tonumber /1024 /1024 * 100 | round/100) MB" else "Unknown" end)#\(.parent)#\(.shared)\n")' | column -ts'#' | sed -e 's/[ ]*$//' -e "s/true$/${yellowtext}true${resetcolor}/" -e "s/\([0-9]\{4,10\}\.[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g" -e "s/Unknown/${yellowtext}Unknown${resetcolor}/g"
+      echo -e " |-> ${cyantext}Containers${resetcolor} ($(echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .containers | length'))"
+      if [[ $(echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .containers | length') != 0 ]]
+      then
+        echo ${IMAGE_JSON} | jq -r --arg image ${image} '" \\    Namespace#POD Name#Container Name#Container ID#Container Layer ID#State",(.[] | select(.status.id == $image) | .containers[]? | "  |-> \(.namespace)#\(.podname)#\(.name)#\(.id)#\(.layerID)#\(.state)")' | column -ts'#' | sed -e 's/[ ]*$//' | sed -e "s/CONTAINER_EXITED/${redtext}Exited${resetcolor}/" -e "s/CONTAINER_RUNNING/${greentext}Running${resetcolor}/" -e "s/\(CONTAINER_[A-Za-z0-9]*\)/${yellowtext}Running${resetcolor}/"
+      fi
+      echo -e "--------------------------------------------\n"
+    done
+  fi
 }
 
 ##### Main
@@ -328,6 +396,8 @@ MAX_RANDOM=10
 # Source URLs & version time_gap
 SOURCE_RAW_URL="https://raw.githubusercontent.com/vlours/sos4ocp/refs/heads/main/sos4ocp.sh"
 SOURCE_URL="https://github.com/vlours/sos4ocp/"
+# Display the number of processed files during the image size calculation (can be set to "false" to disable it)
+DISPLAY_FILE_COUNT=${DISPLAY_FILE_COUNT:-"true"}
 
 # Getops
 if [[ $# != 0 ]]
@@ -338,7 +408,7 @@ then
     fct_help && exit 1
   fi
   OPTNUM=0
-  while getopts :i:I:p:c:Dg:n:o:P:u:s:S:hv arg; do
+  while getopts :i:I:p:c:D:g:m:n:o:P:u:s:S:hv arg; do
   case $arg in
       i)
         PODID=${OPTARG}
@@ -361,13 +431,32 @@ then
         PODFILTER="CONTAINER"
         ;;
       D)
-        DISKPRESSURE=true
-        OPTNUM=$[OPTNUM + 1]
+        DISKPRESSURE=${OPTARG}
+        case ${DISKPRESSURE} in
+          sum|both|layers)
+            ;;
+          *)
+            echo -e "${redtext}Err: invalid value '${DISKPRESSURE}' for the diskPressure option${resetcolor}"
+            fct_help && exit 1
+            ;;
+        esac
+        if [[ -z ${IMAGEID} ]]
+        then
+          OPTNUM=$[OPTNUM + 1]
+        fi
         ;;
       g)
         CGROUP=${OPTARG}
         OPTNUM=$[OPTNUM + 1]
         PODFILTER="CGROUP"
+        ;;
+      m)
+        IMAGEID=${OPTARG}
+        PODFILTER="IMAGE"
+        if [[ -z ${DISKPRESSURE} ]]
+        then
+          OPTNUM=$[OPTNUM + 1]
+        fi
         ;;
       n)
         NAMESPACE=${OPTARG}
@@ -423,7 +512,7 @@ then
             SORTFILTER='n'
             ;;
           *)
-            echo "${redtext}Err: invalid sorting key '${SORT_KEY}' for the container statistic${resetcolor}"
+            echo -e "${redtext}Err: invalid sorting key '${SORT_KEY}' for the container statistic${resetcolor}"
             fct_help && exit 1
             ;;
         esac
@@ -463,7 +552,7 @@ then
   then
     SOSREPORT_PATH=$(ls -1d ${SOSREPORT_PATH}/*sosreport* 2>${STD_ERR}| head -1)
   else
-    echo "${redtext}Err: Unable to find the 'crio' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}${resetcolor}"
+    echo -e "${redtext}Err: Unable to find the 'crio' folder in the SOSREPORT PATH. Invalid SOSREPORT PATH: ${SOSREPORT_PATH}${resetcolor}"
     fct_help && exit 5
   fi
 fi
@@ -504,14 +593,33 @@ PSFAUXWWW="${SOSREPORT_PATH}/sos_commands/process/ps_auxfwww"
 PSAUXWWWM="${SOSREPORT_PATH}/sos_commands/process/ps_auxwwwm"
 PS_GROUP="${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_nlwp_start_time_comm_cgroup"
 
-clear
-
 if [[ ! -z ${DISKPRESSURE} ]]
 then
-  fct_image_size
+  OVERLAY_LAYERS_FILE=${SOSREPORT_PATH}/var/lib/containers/storage/overlay-layers/layers.json
+  IMAGEPATH=${IMAGEPATH:-$(dirname $(find  ${CRIO_PATH}/ -name "crictl_inspecti_*")  2>/dev/null | sort -u)}
+  if [[ -z ${IMAGEPATH} ]]
+  then
+    echo -e "${redtext}ERR: Unable to find any crictl_inspecti_\* file in the crio folder: ${IMAGEPATH}\nPlease check the content of the sosreport${resetcolor}\n" && exit 8
+  fi
+  if [[ -z ${CONTAINERPATH} ]]
+  then
+    echo -e "${yellowtext}WARN: container inspect files are missing. Unable to correlate the image size with the container name and ids${resetcolor}"
+  fi
+  if [[ -f ${OVERLAY_LAYERS_FILE} ]]
+  then
+    fct_image_size_overlay
+  else
+    echo -e "${yellowtext}WARN: Unable to find the overlay layers file in the sosreport (<SOSREPORT_PATH>/var/lib/containers/storage/overlay-layers/layers.json).\nThe image size will be calculated based on the crictl_inspecti_* files only, without correlating with the shared layers sizes.${resetcolor}"
+    fct_image_size_overlay
+    echo -e "${yellowtext}WARN: Unable to find the overlay layers file in the sosreport (<SOSREPORT_PATH>/var/lib/containers/storage/overlay-layers/layers.json).\nThe image size will be calculated based on the crictl_inspecti_* files only, without correlating with the shared layers sizes.${resetcolor}"
+  fi
   exit 0
 fi
 
+clear
+
+#Check the crictl_ps_-a file to be able to correlate the POD ID based on the collected data
+PODID_POSITION=$(head -1 ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | awk '{if($NF == "NAMESPACE"){print "2"}else if($NF == "POD"){print "1"}else{print "0"}}')
 if [[ ${OPTNUM} == 0 ]]
 then
   POD_LIST=($(awk '{if(($1 != "POD") && ($1 !~ "^time=")){printf "%s,%s,%s,%s\n",$1,$(NF-3),$(NF-2),$(NF-4)}}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sort -r -k 4 -k3 -t',' | awk '{printf "%s ",$0}'))
@@ -521,7 +629,7 @@ else
   then
     case ${PODFILTER} in
       "CONTAINER")
-        POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} '{if($(NF-2) == containername){printf "%s ",$NF}else if($(NF-3) == containername){print $(NF-1)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$(NF-1)}'))
+        POD_IDS_LIST=($(awk -v containername=${CONTAINERNAME} -v position=${PODID_POSITION} '{if($(NF-position-2) == containername){print $(NF-position)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u  | awk '{printf "%s ",$0}'))
         echo -e "List of PODs including the container: ${CONTAINERNAME}\n"
         ;;
       "CONTAINERID")
@@ -531,6 +639,10 @@ else
       "CGROUP")
         fct_cgroup
         echo -e "List of PODs including the cgroup: ${CGROUP}\n"
+        ;;
+      "IMAGE")
+        POD_IDS_LIST=($(awk -v imageid=${IMAGEID} -v position=${PODID_POSITION} '{if($(2) == imageid){print $(NF-position)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sort -u | awk '{printf "%s ",$0}'))
+        echo -e "List of PODs including the image ID: ${IMAGEID}\n"
         ;;
       "NAMESPACE")
         POD_IDS_LIST=($(awk -v pod_namespace=${NAMESPACE} '{if($(NF-2) == pod_namespace){printf "%s ",$1}}' ${CRIO_PATH}/crictl_pods 2>/dev/null))
@@ -548,7 +660,7 @@ else
             CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
           fi
         else
-          echo "${yellowtext}WARN: Unable to proceed with the PODs' statistics${resetcolor}"
+          echo -e "${yellowtext}WARN: Unable to proceed with the PODs' statistics${resetcolor}"
           if [[ ! -f ${CRIO_PATH}/crictl_stats ]]
           then
             echo -e "${redtext}ERR: Unable to find the stats file: ${CRIO_PATH}/crictl_stats\n${resetcolor}" && fct_help && exit 7
@@ -558,6 +670,10 @@ else
         fi
         ;;
       "OVERLAY")
+        if [[ ! -d ${PODPATH} ]]
+        then
+          echo -e "${redtext}ERR: The <$PODPATH> does not exist and is required for this option\nPlease check the content of the sosreport${resetcolor}" && fct_help && exit 9
+        fi
         POD_IDS_LIST=($(jq -r --arg overlay "${OVERLAY}" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
         if [[ -z ${POD_IDS_LIST} ]]
         then
@@ -577,11 +693,15 @@ else
             fct_cgroup
           fi
         else
-          echo "${redtext}ERR: Unable to retrieve the Process ID details as the process files are missing.${resetcolor}"
+          echo -e "${redtext}ERR: Unable to retrieve the Process ID details as the process files are missing.${resetcolor}"
         fi
         echo -e "List of PODs including the PROC_PID: ${PROC_PID}\n"
         ;;
       "PODUID")
+        if [[ ! -d ${PODPATH} ]]
+        then
+          echo -e "${redtext}ERR: The <$PODPATH> does not exist and is required for this option\nPlease check the content of the sosreport${resetcolor}" && fct_help && exit 9
+        fi
         POD_IDS_LIST=($(jq -r --arg poduid "${PODUID}" '.? | select(.status.metadata.uid == $poduid) | "\(.status.id[0:13]) "' $(file ${PODPATH}/crictl_inspectp_* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null))
         echo -e "List of PODs including the POD_UID: ${PODUID}\n"
         ;;
@@ -648,11 +768,12 @@ then
 else
   # Create the List of option  for the Menu
   CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
-  LIST_OPTION=("${purpletext}Inspect POD:|${PODNAME}|(${PODID})${resetcolor},fct_inspect "pod" ${PODID}")
+  LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspect "pod" ${PODID}")
   for CONTAINER_INFO in ${CONTAINER_IDS[*]}
   do
     CONTAINER_ID=$(echo ${CONTAINER_INFO} | cut -d',' -f1)
     CONTAINER_NAME=$(echo ${CONTAINER_INFO} | cut -d',' -f2)
+    CONTAINER_IMAGE=$(echo ${CONTAINER_INFO} | cut -d',' -f3)
     FILEPATH="${CONTAINERPATH}/crictl_inspect_${CONTAINER_ID}"
     FILENAME=$(ls -1 ${FILEPATH}* 2>/dev/null)
     if [[ -f ${FILENAME} ]]
@@ -661,14 +782,14 @@ else
     else
       ATTEMPTS=$(awk -v containerid=${CONTAINER_ID} '{if($1 == containerid){printf "%s",$(NF-2)}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null)
     fi
-    if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]])
+    if ([[ ! -z ${CONTAINERID} ]] && [[ ${CONTAINERID} == ${CONTAINER_ID} ]]) || ([[ ! -z ${CONTAINERNAME} ]] && [[ ${CONTAINERNAME} == ${CONTAINER_NAME} ]]) || ([[ ! -z ${IMAGEID} ]] && [[ ${IMAGEID} == ${CONTAINER_IMAGE} ]])
     then
-      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})|<<<<< Matching Filter,fct_inspect "container" ${CONTAINER_ID}")
     else
-      LIST_OPTION+=("${cyantext}Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID})${resetcolor},fct_inspect "container" ${CONTAINER_ID}")
+      LIST_OPTION+=("Inspect Container:|${CONTAINER_NAME}|(${CONTAINER_ID})|${ATTEMPTS}|$(fct_container_statistic ${CONTAINER_ID}),fct_inspect "container" ${CONTAINER_ID}")
     fi
-    LIST_OPTION+=("${greentext}Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_inspect "log" ${CONTAINER_ID}")
-    LIST_OPTION+=("${yellowtext}Display Container proc:|${CONTAINER_NAME}|(${CONTAINER_ID})${resetcolor},fct_container_processes ${CONTAINER_ID}")
+    LIST_OPTION+=("Display Container log:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_inspect "log" ${CONTAINER_ID}")
+    LIST_OPTION+=("Display Container proc:|${CONTAINER_NAME}|(${CONTAINER_ID}),fct_container_processes ${CONTAINER_ID}")
   done
   OPTION_NUM=$(echo ${#LIST_OPTION[@]})
   fct_display_menu
