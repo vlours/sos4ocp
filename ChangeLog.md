@@ -12,6 +12,23 @@
 
 --------
 
+## Version 1.4.0
+
+### Minor updates - 1.4.0
+
+- Rewriting the '-D' options based on feature requests '4283' for the 'sos' tool
+- Option '-D' does now have 3 options 'sum','layers','both'
+- Adding the option '-m' to filter the POD/containers based on the image ID, also filtering the '-D' option.
+
+### Release updates - 1.4.0
+
+- Update the Readme.md accordingly + fix Readme format.
+- Stopping the script when the 'PODPATH' does not exist and is required by the options.
+- Fix missing 'echo -e' when using coloured messages.
+- Adding supportability cross versions, as some fields have been added over time, such as the namespace in the 'crictl ps' output from 4.19.
+
+--------
+
 ## Version 1.3.1
 
 ### Minor updates - 1.3.1
