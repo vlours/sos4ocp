@@ -370,7 +370,7 @@ fct_image_size_overlay()
       echo -e " |-> ${cyantext}Containers${resetcolor} ($(echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .containers | length'))"
       if [[ $(echo ${IMAGE_JSON} | jq -r --arg image ${image} '.[] | select(.status.id == $image) | .containers | length') != 0 ]]
       then
-        echo ${IMAGE_JSON} | jq -r --arg image ${image} '" \\    Namespace#POD Name#Container Name#Container ID#Container Layer ID#State",(.[] | select(.status.id == $image) | .containers[]? | "  |-> \(.namespace)#\(.podname)#\(.name)#\(.id)#\(.layerID)#\(.state)")' | column -ts'#' | sed -e 's/[ ]*$//' | sed -e "s/CONTAINER_EXITED/${redtext}Exited${resetcolor}/" -e "s/CONTAINER_RUNNING/${greentext}Running${resetcolor}/" -e "s/\(CONTAINER_[A-Za-z0-9]*\)/${yellowtext}Running${resetcolor}/"
+        echo ${IMAGE_JSON} | jq -r --arg image ${image} '" \\    Namespace#POD Name#Container Name#Container ID#Container Layer ID#State",(.[] | select(.status.id == $image) | .containers | sort_by(.namespace,.podname,.name) | .[]? | "  |-> \(.namespace)#\(.podname)#\(.name)#\(.id)#\(.layerID)#\(.state)")' | column -ts'#' | sed -e 's/[ ]*$//' | sed -e "s/CONTAINER_EXITED/${redtext}Exited${resetcolor}/" -e "s/CONTAINER_RUNNING/${greentext}Running${resetcolor}/" -e "s/\(CONTAINER_[A-Za-z0-9]*\)/${yellowtext}Running${resetcolor}/"
       fi
       echo -e "--------------------------------------------\n"
     done
