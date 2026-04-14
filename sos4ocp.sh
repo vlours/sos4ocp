@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.4.0
+# @VERSION     # 1.4.1
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -719,27 +719,6 @@ else
   fi
 fi
 
-# Trunking the PODID to 13 characters
-PODID=$(echo ${PODID}  | cut -c1-13)
-
-# Collect the POD Details & set the missing value
-POD_HEADER=$(awk '($1 == "POD"){print}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/POD ID/POD_ID/")
-POD_DETAILS=${POD_DETAILS:-$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
-if [[ -z "${POD_DETAILS}" ]]
-then
-  echo -e "Unable to find a POD from the specified parameter\n" && fct_help && exit 10
-fi
-if [[ ${PODID} == "null" ]]
-then
-  PODID=$(echo "${POD_DETAILS}" | awk '{print $1}')
-fi
-if [[ ${PODNAME} == "null" ]]
-then
-  PODNAME=$(echo "${POD_DETAILS}" | awk '{print $(NF-3)}')
-fi
-# Collect the Container(s) details and create an Array with the IDs
-fct_container_details
-
 # Check the type of crictl_stats files
 if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats 2>/dev/null) ]]
 then
@@ -766,6 +745,26 @@ then
   SUM_STATS=$(awk 'BEGIN{sum_cpu=0;sum_mem=0;sum_disk=0;sum_inode=0} {sum_cpu+=$3;mem_value=substr($4,1,length($4)-1);mem_unit=substr($4,length($4)-1);if(mem_unit=="GB"){sum_mem+=(mem_value * 1024)} else if(mem_unit=="TB"){sum_mem+=(mem_value * 1024 * 1024)} else if((mem_unit=="kB")||(mem_unit=="KB")){sum_mem+=(mem_value / 1024)} else {sum_mem+=mem_value};disk_value=substr($5,1,length($5)-1);disk_unit=substr($5,length($5)-1);if(disk_unit=="GB"){sum_disk+=(disk_value * 1024)} else if(disk_unit=="TB"){sum_disk+=(disk_value * 1024 * 1024)} else if((disk_unit=="kB") || (disk_unit=="KB")){sum_disk+=(disk_value / 1024)} else {sum_disk+=disk_value};sum_inode+=$NF} END{print sum_cpu"|"sum_mem" MB|"sum_disk" MB|"sum_inode}' ${CRIO_PATH}/crictl_stats)
   echo -e " | | | | | |TOTAL|${SUM_STATS}\n | | | | | |-------|-------------|---------|----------|------|\nPOD ID|POD NAME|CONTAINER ID|CONTAINER NAME|STATE|CREATED|ATTEMPT|CPU USAGE (%)|MEM USAGE|DISK USAGE|INODES|\n------|---------|------------|--------------|-----|-------|-------|-------------|---------|----------|------|\n${CONTAINERS_STAT_LIST}" | column -t -s'|'
 else
+  # Trunking the PODID to 13 characters
+  PODID=$(echo ${PODID}  | cut -c1-13)
+
+  # Collect the POD Details & set the missing value
+  POD_HEADER=$(awk '($1 == "POD"){print}' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/POD ID/POD_ID/")
+  POD_DETAILS=${POD_DETAILS:-$(awk -v podid=${PODID} -v podname=${PODNAME} '{if(($1 == podid) || ($(NF-3) == podname)){print} }' ${CRIO_PATH}/crictl_pods 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")}
+  if [[ -z "${POD_DETAILS}" ]]
+  then
+    echo -e "Unable to find a POD from the specified parameter\n" && fct_help && exit 10
+  fi
+  if [[ ${PODID} == "null" ]]
+  then
+    PODID=$(echo "${POD_DETAILS}" | awk '{print $1}')
+  fi
+  if [[ ${PODNAME} == "null" ]]
+  then
+    PODNAME=$(echo "${POD_DETAILS}" | awk '{print $(NF-3)}')
+  fi
+  # Collect the Container(s) details and create an Array with the IDs
+  fct_container_details
   # Create the List of option  for the Menu
   CONTAINER_HEADER=$(awk '($1 == "CONTAINER"){print}' ${CRIO_PATH}/crictl_ps_-a | sed -e "s/POD ID/POD_ID/")
   LIST_OPTION=("Inspect POD:|${PODNAME}|(${PODID}),fct_inspect "pod" ${PODID}")

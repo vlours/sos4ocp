@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.4.1
+
+### Minor updates - 1.4.1
+
+- None
+
+### Release updates - 1.4.1
+
+- Fixing a bug with the Statistic (-S) option
+
+--------
+
 ## Version 1.4.0
 
 ### Minor updates - 1.4.0
