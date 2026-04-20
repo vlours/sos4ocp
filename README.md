@@ -34,7 +34,7 @@ sos4ocp_dir=$(dirname $(alias sos4ocp | cut -d"'" -f2)); cd ${sos4ocp_dir}; git 
 ### Remove the script (_based on the alias_)
 
 ```bash
-sos4ocp_dir=$(dirname $(alias mg_check | cut -d"'" -f2))
+sos4ocp_dir=$(dirname $(alias sos4ocp | cut -d"'" -f2))
 if [[ -d ${sos4ocp_dir} ]]; then rm -rf ${sos4ocp_dir}; fi
 sed -i -e "/alias sos4ocp/d" ${HOME}/.bashrc
 ```
