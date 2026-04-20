@@ -12,6 +12,23 @@
 
 --------
 
+## Version 1.4.2
+
+### Minor updates - 1.4.2
+
+- None
+
+### Release updates - 1.4.2
+
+- Including the container space usage in the '-D' option from the crictl_stats, when available.
+- Script optimization to significally reduce the time to collect data and display layers.
+- Add an extra end-of-line for the 'INFO','WARN', 'ERR' messages to avoid any confusion, when multiple are triggered.
+- Fixing a typo in the 'Readme' where the uninstall commands are using the wrong alias.
+- Fixing a bug when the 'PODID' was not set properly when multiple POD Name were matching in the 'crictl_pods' file.
+- Fixing a typo where the 'PODPATH' was not set correctly when missing.
+
+--------
+
 ## Version 1.4.1
 
 ### Minor updates - 1.4.1
