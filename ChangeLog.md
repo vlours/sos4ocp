@@ -26,6 +26,7 @@
 - Fixing a typo in the 'Readme' where the uninstall commands are using the wrong alias.
 - Fixing a bug when the 'PODID' was not set properly when multiple POD Name were matching in the 'crictl_pods' file.
 - Fixing a typo where the 'PODPATH' was not set correctly when missing.
+- Fixing a missing PODNAME in the statistic view, when the namespace is inclucded in the result of the command 'crictl_ps_-a'
 
 --------
 
