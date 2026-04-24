@@ -703,12 +703,7 @@ else
       then
         POD_DETAILS=$(grep -Ev "^POD" ${CRIO_PATH}/crictl_pods)
         CONTAINER_DETAILS=$(awk '{if($1 != "CONTAINER"){print}}' ${CRIO_PATH}/crictl_ps_-a 2>/dev/null | sed -e "s/About \([a-z]*\) \([a-z]*\) ago/About_\1_\2_ago/" -e "s/\([0-9]*\) \([a-z]*\) ago/\1_\2_ago/")
-        if [[ $(head -1 ${CRIO_PATH}/crictl_ps_-a | awk '{print $NF}') == "POD" ]]
-        then
-          CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,$8,$1,$5,$4,$3,$6}'))
-        else
-          CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk '{printf "%s|%s|%s|%s|%s|%s|%s ",$7,"-",$1,$5,$4,$3,$6}'))
-        fi
+        CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk -v position=${PODID_POSITION} '{if($(NF-position+1) != ""){podname=$(NF-position+1)}else{podname="-"} printf "%s|%s|%s|%s|%s|%s|%s ",$(NF-position),podname,$1,$5,$4,$3,$6}'))
       else
         if [[ ! -f ${CRIO_PATH}/crictl_stats ]]
         then
