@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.4.2
+# @VERSION     # 1.4.3
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -201,17 +201,17 @@ CONTAINER_IDS=($(echo "${CONTAINER_DETAILS}" |awk -v position=${PODID_POSITION} 
 #Retrieve container statistic
 fct_container_statistic(){
   #Check if the container name is included in the crictl_stats data
-  case ${CRICTL_STATS_TYPE} in
-    "name")
-      awk -v container_id=$1 '{if($1 == container_id){stats=$3"|"$4"|"$5"|"$6}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats 2>/dev/null
-      ;;
-    "other")
-      awk -v container_id=$1 '{if($1 == container_id){stats=$2"|"$3"|"$4"|"$5}}END{if (stats != ""){printf stats}else{printf "-|-|-|-"}}' ${CRIO_PATH}/crictl_stats 2>/dev/null
-      ;;
-    *)
-      echo | awk '{printf "-|-|-|-"}'
-      ;;
-  esac
+  awk -v container_id="$1" -v stats_type="${CRICTL_STATS_TYPE}" '
+    BEGIN { stats = "-|-|-|-" }
+    $1 == container_id {
+      if (stats_type == "name") {
+        stats = $3"|"$4"|"$5"|"$6
+      } else if (stats_type == "other") {
+        stats = $2"|"$3"|"$4"|"$5
+      }
+    }
+    END { print stats }
+  ' "${CRIO_PATH}/crictl_stats" 2>/dev/null
 }
 
 #Retrieve POD list based on CGROUP
@@ -277,12 +277,18 @@ fct_container_processes(){
 # Retrieve Image Sizes to help troubleshoot diskPressure conditions - if possible based on correlating the overlay layers with the container names and ids
 fct_image_size_overlay()
 {
+
   IMAGE_JSON="[]"
   CONTAINER_LIST="[]"
-  CONTAINER_FILE_LIST=$(file ${CONTAINERPATH}/crictl_inspect_* | grep -E "JSON data" | cut -d':' -f1)
-  NBFILE=$(echo ${CONTAINER_FILE_LIST} | wc -w)
+  # Build list of valid JSON container files
+  local container_files=()
+  for f in "${CONTAINERPATH}"/crictl_inspect_*; do
+    [[ -f "$f" ]] && jq -e . "$f" &>/dev/null && container_files+=("$f")
+  done
+
+  NBFILE=${#container_files[@]}
   Count=1
-  for containerfile in ${CONTAINER_FILE_LIST}
+  for containerfile in "${container_files[@]}"
   do
     if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
     then
@@ -307,35 +313,56 @@ fct_image_size_overlay()
     CONTAINER_LIST=$( echo ${CONTAINER_LIST} | jq -rc --argjson container_details "${CONTAINER_DETAILS}" '. + [ $container_details ]')
   done
   # Collect the shared layers across all images and count the number of images sharing each layer.
-  SHARED_LAYERS=$(jq -rs '.[].info.imageSpec.rootfs."diff_ids"[]' $(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1) | sort | uniq -c | sort -n | grep -Ev "^ *1 sha256" | awk '{printf "%s+%d\n",$2,$1}')
+  local image_files=()
+  for f in "${IMAGEPATH}"/crictl_inspecti_*; do
+    [[ -f "$f" ]] && jq -e . "$f" &>/dev/null && image_files+=("$f")
+  done
+
+  SHARED_LAYERS=$(jq -rs '.[].info.imageSpec.rootfs."diff_ids"[]' "${image_files[@]}" 2>/dev/null | sort | uniq -c | sort -n | grep -Ev "^ *1 sha256" | awk '{printf "%s+%d\n",$2,$1}')
+
   # Calculate the replicate space used by each shared layer
   SHARED_LAYER_JSON="[]"
-  for sha256_layer in ${SHARED_LAYERS}
-  do
-    layer_id=$(echo ${sha256_layer} | cut -d'+' -f1)
-    count=$(echo ${sha256_layer} | cut -d'+' -f2)
-    if [[ -f ${OVERLAY_LAYERS_FILE} ]]
-    then
-      SHARED_LAYER_DETAILS=$(jq -r --arg layer ${layer_id} --arg count ${count} '.[] | select(."diff-digest" == $layer) | {"diff-digest",id,parent,"diff-size","count":$count}' ${OVERLAY_LAYERS_FILE})
+  if [[ -n "${SHARED_LAYERS}" ]]; then
+    if [[ -f "${OVERLAY_LAYERS_FILE}" ]]; then
+      SHARED_LAYER_JSON=$(
+        printf '%s\n' ${SHARED_LAYERS} |
+        awk -F'+' '{print "{\"layer\":\"" $1 "\",\"count\":\"" $2 "\"}"}' |
+        jq -s --slurpfile overlay_layers "${OVERLAY_LAYERS_FILE}" '
+          map(
+            .layer as $layer | .count as $count |
+            ($overlay_layers[0][] | select(."diff-digest" == $layer) | . + {"count": $count}) //
+            {"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "count": $count}
+          )
+        '
+      )
     else
-      SHARED_LAYER_DETAILS=$(jq -n --arg layer ${layer_id} --arg count ${count} '{"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "count": $count}')
+      SHARED_LAYER_JSON=$(
+        printf '%s\n' ${SHARED_LAYERS} |
+        awk -F'+' '{print "{\"diff-digest\":\"" $1 "\",\"id\":null,\"parent\":null,\"diff-size\":null,\"count\":\"" $2 "\"}"}' |
+        jq -s '.'
+      )
     fi
-    SHARED_LAYER_JSON=$(echo ${SHARED_LAYER_JSON} | jq -rc --argjson layer_details "${SHARED_LAYER_DETAILS}" '. + [ $layer_details ]')
-  done
+  fi
+
+  # Process image files
   if [[ -z ${IMAGEID} ]]
   then
-    IMAGE_FILE_LIST=$(file ${IMAGEPATH}/crictl_inspecti_* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+    IMAGE_FILE_LIST=("${image_files[@]}")
   else
-    IMAGE_FILE_LIST=$(file ${IMAGEPATH}/crictl_inspecti_${IMAGEID}* 2>/dev/null | grep -E "JSON data" | cut -d':' -f1)
+    IMAGE_FILE_LIST=()
+    for f in "${IMAGEPATH}"/crictl_inspecti_${IMAGEID}*; do
+      [[ -f "$f" ]] && jq -e . "$f" &>/dev/null && IMAGE_FILE_LIST+=("$f")
+    done
   fi
+
   if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
   then
       echo
-      NBFILE=$(echo ${IMAGE_FILE_LIST} | wc -w)
+      NBFILE=${#IMAGE_FILE_LIST[@]}
       Count=1
   fi
   # Create JSON data with the image details, the list of containers using this image and the layer details (size, shared or not)
-  for imagefile in ${IMAGE_FILE_LIST}
+  for imagefile in "${IMAGE_FILE_LIST[@]}"
   do
     if [[ ${DISPLAY_FILE_COUNT} == "true" ]]
     then
@@ -371,7 +398,7 @@ fct_image_size_overlay()
     echo -e "##################################################"
     echo ${IMAGE_JSON} | jq -rc --argjson containers "${CONTAINER_LIST}" '(. | length) as $nbimages | ($containers | length) as $nbcontainers |"# Number of Images:|\($nbimages)\n# Number of Containers:|\($nbcontainers)"' | column -ts'|' | sed -e 's/[ \t]*$//'
     echo -e "##################################################"
-    echo ${IMAGE_JSON} | jq -rc --argjson containers "${CONTAINER_LIST}" --argjson sharedlayerjson ${SHARED_LAYER_JSON} '([.[] | (.status.size // 0) | tonumber] | add * 100/1024/1024 | round/100) as $total | ([$sharedlayerjson | .[]? | ((."diff-size" // 0) | tonumber) * (((.count // 1) | tonumber) -1) ] | add * 100/1024/1024 | round/100) as $duplicshared | ([($containers | .[] | ((if (.disk == "null") then 0 else .disk end) // 0 | tonumber))] | add * 100 | round / 100) as $containersize|  "# TOTAL IMAGE SIZE:|\($total)|MB\n# DUPLICATE SHARED LAYERS SPACE:|\(if($duplicshared > 0) then "-\($duplicshared)|MB" else "Unknown" end)\n# CONTAINER LAYERS SPACE ON DISK:|\(if($containersize > 0) then "\($containersize)|MB" else "Unknown" end)\n# TOTAL USED SPACE ON DISK:|\(if(($duplicshared > 0) and ($containersize > 0)) then "\(($total - $duplicshared + $containersize) * 100 | round /100)|MB" else "Unknown" end)"' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/\(DUPLICATE SHARED LAYERS SPACE: *\)\([0-9.-]*\)/\1${purpletext}\2${resetcolor}/" -e "s/\(DUPLICATE SHARED LAYERS SPACE: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(TOTAL IMAGE SIZE: *\)\([0-9.]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(TOTAL USED SPACE ON DISK: *\)\([0-9.]*\)/\1${greentext}\2${resetcolor}/" -e "s/\(TOTAL USED SPACE ON DISK: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(CONTAINER LAYERS SPACE ON DISK: *\)\([0-9.]*\)/\1${cyantext}\2${resetcolor}/" -e "s/\(CONTAINER LAYERS SPACE ON DISK: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/"
+    echo ${IMAGE_JSON} | jq -rc --argjson containers "${CONTAINER_LIST}" --argjson sharedlayerjson "${SHARED_LAYER_JSON}" '([.[] | (.status.size // 0) | tonumber] | add * 100/1024/1024 | round/100) as $total | ([$sharedlayerjson | .[]? | ((."diff-size" // 0) | tonumber) * (((.count // 1) | tonumber) -1) ] | add * 100/1024/1024 | round/100) as $duplicshared | ([($containers | .[] | ((if (.disk == "null") then 0 else .disk end) // 0 | tonumber))] | add * 100 | round / 100) as $containersize|  "# TOTAL IMAGE SIZE:|\($total)|MB\n# DUPLICATE SHARED LAYERS SPACE:|\(if($duplicshared > 0) then "-\($duplicshared)|MB" else "Unknown" end)\n# CONTAINER LAYERS SPACE ON DISK:|\(if($containersize > 0) then "\($containersize)|MB" else "Unknown" end)\n# TOTAL USED SPACE ON DISK:|\(if(($duplicshared > 0) and ($containersize > 0)) then "\(($total - $duplicshared + $containersize) * 100 | round /100)|MB" else "Unknown" end)"' | column -ts'|' | sed -e 's/[ \t]*$//' -e "s/\(DUPLICATE SHARED LAYERS SPACE: *\)\([0-9.-]*\)/\1${purpletext}\2${resetcolor}/" -e "s/\(DUPLICATE SHARED LAYERS SPACE: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(TOTAL IMAGE SIZE: *\)\([0-9.]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(TOTAL USED SPACE ON DISK: *\)\([0-9.]*\)/\1${greentext}\2${resetcolor}/" -e "s/\(TOTAL USED SPACE ON DISK: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/" -e "s/\(CONTAINER LAYERS SPACE ON DISK: *\)\([0-9.]*\)/\1${cyantext}\2${resetcolor}/" -e "s/\(CONTAINER LAYERS SPACE ON DISK: *\)\([A-Za-z]*\)/\1${yellowtext}\2${resetcolor}/"
     echo -e "##################################################"
   fi
 
@@ -622,12 +649,7 @@ PS_GROUP="${SOSREPORT_PATH}/sos_commands/process/ps_axo_pid_ppid_user_group_lwp_
 # Check the type of crictl_stats files here as used in all options.
 if [[ -f ${CRIO_PATH}/crictl_stats ]] && [[ -z $(grep "level=fatal msg=" ${CRIO_PATH}/crictl_stats 2>/dev/null) ]]
 then
-  if [[ $(awk 'BEGIN{namepresence="false"}{if($2 == "NAME"){namepresence="true"}}END{print namepresence}' ${CRIO_PATH}/crictl_stats) == "true" ]]
-  then
-    CRICTL_STATS_TYPE=name
-  else
-    CRICTL_STATS_TYPE=other
-  fi
+  CRICTL_STATS_TYPE=$(awk 'NR==1 && $2 == "NAME" {print "name"; exit} NR==1 {print "other"; exit}' "${CRIO_PATH}/crictl_stats")
 else
   echo -e "${yellowtext}WARN: The file crictl_stats is missing or invalid. Unable to provide the PODs' statistics${resetcolor}\n"
   CRICTL_STATS_TYPE=none
