@@ -12,6 +12,18 @@
 
 --------
 
+## Version 1.4.3
+
+### Minor updates - 1.4.3
+
+- None
+
+### Release updates - 1.4.3
+
+- Code optimization to reduce the time of the option '-D' by ~25%
+
+--------
+
 ## Version 1.4.2
 
 ### Minor updates - 1.4.2
