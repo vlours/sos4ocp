@@ -12,6 +12,19 @@
 
 --------
 
+## Version 1.4.4
+
+### Minor updates - 1.4.4
+
+- None
+
+### Release updates - 1.4.4
+
+- Displaying the POD IP when available.
+- Fixing an issue when a shared layers number is higher than 2.
+
+--------
+
 ## Version 1.4.3
 
 ### Minor updates - 1.4.3
