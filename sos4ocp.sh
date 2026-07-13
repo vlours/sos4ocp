@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.4.3
+# @VERSION     # 1.4.4
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -128,6 +128,10 @@ do
   NUM=0
   fct_title "POD Details"
   echo -e "${POD_HEADER}\n${POD_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\) ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/"
+  if [ ! -z ${PODPATH}/crictl_inspectp_${PODID}* ]
+  then
+    echo -e "\nPOD IPs: [$(jq -cr 'if (.status.state == "SANDBOX_READY") then if (.status.network.ip == "") then "{Primary: HostIP, additionalIps: []}" else {Primary: .status.network.ip, additionalIps: .status.network.additionalIps} end else "{Primary: N/A, additionalIps: []}" end' ${PODPATH}/crictl_inspectp_${PODID}*)]"
+  fi
   fct_title "Containers Details"
   echo -e "${CONTAINER_HEADER}\n${CONTAINER_DETAILS}" | column -t | sed -e "s/About_\([a-z]*\)_\([a-z]*\)_ago/About \1 \2 ago/" -e "s/\([0-9]*\)_\([a-z]*\)_ago/\1 \2 ago/" -e "s/POD_ID/POD ID/" -e "s/\(Exited\)/${redtext}\1${resetcolor}/" -e "s/\(Running\)/${greentext}\1${resetcolor}/"
   echo
@@ -376,13 +380,25 @@ fct_image_size_overlay()
     for sha256_layer in ${SHA256_IMAGE_LAYERS}
     do
       SHARED_LAYER_BOOL=$(echo ${SHARED_LAYER_JSON} | jq -r --arg layer "${sha256_layer}" '(.[] | select(."diff-digest" == $layer)| if (."diff-digest" == $layer) then true else false end) // false')
+      if [[ ${SHARED_LAYER_BOOL} != "true" ]] && [[ ${SHARED_LAYER_BOOL} != "false" ]]
+      then
+        if [[ $(echo  ${SHARED_LAYER_BOOL} | grep "true") ]]
+        then
+          SHARED_LAYER_BOOL="true"
+        else
+          SHARED_LAYER_BOOL="false"
+        fi
+      fi
       if [[ -f ${OVERLAY_LAYERS_FILE} ]]
       then
-        LAYER_DETAILS=$(jq -r --arg layer "${sha256_layer}" --arg shared ${SHARED_LAYER_BOOL} '(.[] | select(."diff-digest" == $layer) | {"diff-digest",id,parent,"diff-size","shared":$shared}) // {"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "shared": $shared}' ${OVERLAY_LAYERS_FILE})
+        LAYER_DETAILS=$(jq -rc --arg layer "${sha256_layer}" --arg shared ${SHARED_LAYER_BOOL} '(.[] | select(."diff-digest" == $layer) | {"diff-digest",id,parent,"diff-size","shared":$shared}) // {"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "shared": $shared}' ${OVERLAY_LAYERS_FILE})
       else
         LAYER_DETAILS=$(jq -n --arg layer "${sha256_layer}" --arg shared ${SHARED_LAYER_BOOL} '{"diff-digest": $layer, "id": null, "parent": null, "diff-size": null, "shared": $shared}')
       fi
-      LAYER_JSON=$(echo ${LAYER_JSON} | jq -rc --argjson layer_details "${LAYER_DETAILS}" '. + [ $layer_details ]')
+      for Layer_Detail in ${LAYER_DETAILS}
+      do
+        LAYER_JSON=$(echo ${LAYER_JSON} | jq -rc --argjson layer_details "${Layer_Detail}" '. + [ $layer_details ]')
+      done
     done
     CONTAINER_MATCH=$(echo ${CONTAINER_LIST} | jq -r --arg imageid ${IMAGE_ID} '.[] | select(.imageId == $imageid) | {name, id: .id[0:13], layerID, state, namespace, podname, disk: (.disk | tonumber * 1000 | round /1000)}' | jq -s)
     # Creating a specific variable for each image to split the original huge variable.
