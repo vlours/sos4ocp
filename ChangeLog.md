@@ -12,6 +12,23 @@
 
 --------
 
+## Version 1.5.0
+
+### Minor updates - 1.5.0
+
+- None
+
+### Release updates - 1.5.0
+
+- The `-o` option now classifies a storage overlay that does not match any running POD or container: it identifies whether the overlay is a container writable layer, an image top/intermediate (shared) layer, or an orphaned/dangling layer (leftover from a removed image), and displays the available layer details (parent, children, diff-digest, diff-size, created).
+- The `-o` classification lists all the trees a layer belongs to (a layer can be shared by several images and/or be the root of an orphaned branch) in an overview table. Full image/root IDs are shown so they can be reused with other options. Image trees are one row each; the orphaned branch is additionally expanded into a detailed layer listing (full layer ID, size, creation date), each row typed ORPHAN (red) or IN-USE (green, e.g. a shared base kept for context), with the overlay passed to `-o` highlighted in yellow.
+- `STORAGE_LAYERS.md` documents how to reclaim space (pruning images with `crictl rmi`/`crictl rmi --prune`, and cleaning orphaned layers with `podman system check --repair` / `podman system prune`), noting that reclamation happens at the image level and that a layer shared by several images is only freed once all of them are removed.
+- Added an orphan search mode (`-o orphan`): lists every orphaned/dangling layer tree in the sosreport, grouped per tree, showing the bottom and top layer details (Type, Layer ID, Layer size, Created), the number of orphaned layers in the tree and the sum of their diff-sizes, plus the grand totals across all trees.
+- Image ownership of a layer is correlated by matching the layer `diff-digest` against the `rootfs.diff_ids` of the `crictl_inspecti_*` files, with a graceful upgrade to `overlay-images/images.json` and `overlay-containers/containers.json` when those are included in the sosreport.
+- New documentation `STORAGE_LAYERS.md` describing the container storage overlay model and how to correlate layers.
+
+--------
+
 ## Version 1.4.4
 
 ### Minor updates - 1.4.4

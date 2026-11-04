@@ -2,7 +2,7 @@
 ##################################################################
 # Script       # sos4ocp.sh
 # Description  # Display POD and related containers details
-# @VERSION     # 1.4.4
+# @VERSION     # 1.5.0
 ##################################################################
 # Changelog.md # List the modifications in the script.
 # README.md    # Describes the repository usage
@@ -32,7 +32,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-c" "Name of a CONTAINER" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-n" "NAMESPACE related to PODs" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-g" "CGROUP attached to a POD or Container" "null"
-  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-o" "Storage OVERLAY ID attached to a Container" "null"
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-o" "Storage OVERLAY ID: lists the POD/container, or classifies image/orphaned layers" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-m" "Image ID attached to a Container (can also be used as a filter with -D option)" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-P" "Process ID (PID) of a process attached to a Container" "null"
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | %-${DESCR_TAB}s | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "-u" "storage UID attached to a POD" "null"
@@ -43,6 +43,7 @@ fct_help(){
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for POD:        kubepods-burstable-pod<ID>" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - CGROUP for Container:  crio-<ID>" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - OVERLAY:               /var/lib/containers/storage/overlay/<OVERLAY>/merged" ""
+  printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - OVERLAY orphans:        use '-o orphan' to list all the orphaned layer trees" ""
   printf "|${cyantext}%${OPTION_TAB}s${resetcolor} | ${yellowtext}%-${DESCR_TAB}s${resetcolor} | ${greentext}%-${DEFAULT_TAB}s${resetcolor}|\n" "" " - POD_UID from storage:  /var/lib/kubelet/pods/<POD_UID>/" ""
   printf "|%${OPTION_TAB}s-|-%-${DESCR_TAB}s-|-%-${DEFAULT_TAB}s|\n" |tr \  '-'
   printf "|%${OPTION_TAB}s | %-${DESCR_TAB}s | %-${DEFAULT_TAB}s|\n" "" "Additional Options:" ""
@@ -446,6 +447,276 @@ fct_image_size_overlay()
   fi
 }
 
+# Identify and describe a storage overlay that does not match any running POD/container.
+# Classifies the overlay as a container layer, image (top/intermediate) layer, or an
+# orphaned/dangling layer, using the overlay-layers/images/containers JSON files when
+# available and falling back to the crictl_inspecti_* diff_ids when they are not.
+fct_overlay_classify(){
+  OVERLAY_LAYERS_FILE=${SOSREPORT_PATH}/var/lib/containers/storage/overlay-layers/layers.json
+  OVERLAY_IMAGES_FILE=${SOSREPORT_PATH}/var/lib/containers/storage/overlay-images/images.json
+  OVERLAY_CONTAINERS_FILE=${SOSREPORT_PATH}/var/lib/containers/storage/overlay-containers/containers.json
+  IMAGEPATH=${IMAGEPATH:-$(dirname $(find ${CRIO_PATH}/ -name "crictl_inspecti_*" 2>${STD_ERR} | head -1) 2>${STD_ERR})}
+
+  if [[ ! -f ${OVERLAY_LAYERS_FILE} ]]
+  then
+    echo -e "${yellowtext}WARN: The overlay <${OVERLAY}> does not match any running POD or container, and the layers file required to classify it is missing:\n  <SOSREPORT_PATH>/var/lib/containers/storage/overlay-layers/layers.json${resetcolor}"
+    echo -e "Please collect the storage JSON files (layers.json, and optionally images.json / containers.json) and add them to the sosreport. See STORAGE_LAYERS.md for details.\n"
+    return 1
+  fi
+
+  # Build an image<->layer index from the crictl_inspecti_* files (diff_ids), used to
+  # correlate layers with images when overlay-images/images.json is not collected.
+  IMG_INDEX="[]"
+  if [[ -n ${IMAGEPATH} ]]
+  then
+    IMG_INDEX=$(jq -s '[ .[] | (.status.id) as $iid
+        | ((.status.repoTags // []) + (.status.repoDigests // []) | .[0] // "-") as $tag
+        | (.info.imageSpec.rootfs.diff_ids // []) as $d
+        | ($d | to_entries[] | {digest:.value, image:$iid, tag:$tag, top:(.key == (($d|length)-1)), pos:(.key+1), total:($d|length)}) ]' \
+        $(file ${IMAGEPATH}/crictl_inspecti_* 2>${STD_ERR} | grep -E "JSON data" | cut -d':' -f1) 2>${STD_ERR})
+  fi
+  [[ -z ${IMG_INDEX} ]] && IMG_INDEX="[]"
+
+  # Use overlay-images/images.json and overlay-containers/containers.json when present
+  # (graceful upgrade); otherwise fall back to an empty set via /dev/null.
+  IMAGES_SRC=${OVERLAY_IMAGES_FILE}; [[ -f ${IMAGES_SRC} ]] || IMAGES_SRC=/dev/null
+  CONTAINERS_SRC=${OVERLAY_CONTAINERS_FILE}; [[ -f ${CONTAINERS_SRC} ]] || CONTAINERS_SRC=/dev/null
+
+  OVERLAY_REPORT=$(jq -r \
+    --arg id "${OVERLAY}" \
+    --argjson imgidx "${IMG_INDEX}" \
+    --slurpfile images "${IMAGES_SRC}" \
+    --slurpfile containers "${CONTAINERS_SRC}" '
+    def sz($b): if ($b == null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+    . as $L
+    | ($images[0] // []) as $IMG
+    | ($containers[0] // []) as $CON
+    | ($L | map({key:.id,value:.}) | from_entries) as $byid
+    | ($byid[$id]) as $t
+    | if $t == null then "ERR_NOLAYER"
+      else
+        ($t."diff-digest") as $tdig
+      | [ $imgidx[] | select(.digest == $tdig) ] as $self_img
+      | [ $IMG[] | select(.layer == $id) ] as $self_img_json
+      | [ $CON[] | select(.layer == $id) ] as $self_con
+      | ($self_img | map(.image) | unique | length) as $nimg
+      | (if $nimg > 1 then " (shared)" else "" end) as $sharedtxt
+      | ( if ($self_con|length)>0 then "Container writable layer"
+          elif ($self_img_json|length)>0 then "Image top layer"
+          elif (($self_img|map(select(.top))|length)>0) then "Image top\($sharedtxt) layer"
+          elif ($self_img|length)>0 then "Image intermediate\($sharedtxt) layer"
+          else "Orphaned / dangling layer (no present image or container references it)"
+          end ) as $type
+      | "OVERLAY TYPE:|\($type)",
+        "@",
+        "Layer ID:|\($t.id)",
+        "Parent:|\(if ($t.parent // "")=="" then "- none (base layer) -" else $t.parent end)",
+        "Direct children:|\($L | map(select(.parent==$id)) | length)",
+        "Diff digest:|\($t."diff-digest" // "-")",
+        "Layer size (diff):|\(sz($t."diff-size"))",
+        "Created:|\($t.created // "-")"
+      end
+  ' "${OVERLAY_LAYERS_FILE}")
+
+  if [[ "${OVERLAY_REPORT}" == "ERR_NOLAYER" ]]
+  then
+    echo -e "${yellowtext}WARN: The overlay <${OVERLAY}> did not match any POD, container, or layer in the collected data.${resetcolor}"
+    echo -e "It may be a stale directory, or the relevant storage files were not collected in this sosreport.\n"
+    return 1
+  fi
+
+  echo -e "${cyantext}Overlay classification for:${resetcolor} ${OVERLAY}\n"
+  if [[ ${IMG_INDEX} == "[]" ]] && [[ ${IMAGES_SRC} == "/dev/null" ]]
+  then
+    echo -e "${yellowtext}INFO: No image inspect data (crictl_inspecti_*) or images.json found - image ownership could not be determined.${resetcolor}\n"
+  fi
+  echo -e "${OVERLAY_REPORT}" | column -ts'|' | sed \
+    -e 's/[ \t]*$//' \
+    -e "s/^@$//" \
+    -e "s/\(OVERLAY TYPE: *\)\(Orphaned.*\)/\1${redtext}\2${resetcolor}/" \
+    -e "s/\(OVERLAY TYPE: *\)\(Container.*\)/\1${greentext}\2${resetcolor}/" \
+    -e "s/\(OVERLAY TYPE: *\)\(Image.*\)/\1${cyantext}\2${resetcolor}/" \
+    -e "s/\([0-9]\{4,10\}\.[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" \
+    -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g" \
+    -e "s/Unknown/${yellowtext}Unknown${resetcolor}/g"
+
+  # Enumerate the trees this layer belongs to: one line per present image, plus the
+  # orphaned branch (with its detailed layer listing).
+  TARGET_DIGEST=$(jq -r --arg id "${OVERLAY}" '(.[] | select(.id==$id) | ."diff-digest") // ""' "${OVERLAY_LAYERS_FILE}")
+  IMG_TREES_JSON=$(echo "${IMG_INDEX}" | jq -c --arg d "${TARGET_DIGEST}" '[ .[] | select(.digest == $d) ] | sort_by(.tag)')
+  NIMG=$(echo "${IMG_TREES_JSON}" | jq 'length' 2>${STD_ERR}); NIMG=${NIMG:-0}
+
+  # Orphaned branch touching this layer (orphan layers in its ancestor/self/descendant scope).
+  ORPHAN_INFO=$(jq -c --arg id "${OVERLAY}" --argjson imgidx "${IMG_INDEX}" '
+    def sz($b): if ($b == null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+    . as $L
+    | ($L | map({key:.id,value:.}) | from_entries) as $byid
+    | ($L | map(select(.parent!=null and .parent!="")) | group_by(.parent)
+         | map({key:.[0].parent, value: map(.id)}) | from_entries) as $ch
+    | ([ $imgidx[].digest ]) as $imgdigs
+    | [ $id | recurse($byid[.].parent | select(.!=null and .!="")) ] as $anc
+    | [ $id | recurse($ch[.][]?) ] as $desc
+    | ($anc + [$id] + $desc | unique) as $scope
+    | [ $scope[] | . as $lid | select( ($imgdigs | index($byid[$lid]."diff-digest")) | not ) ] as $orph
+    | ($orph | reduce .[] as $x ({}; .[$x]=true)) as $oset
+    | [ $orph[] | . as $o | select( ($oset[$byid[$o].parent // ""] // false) | not ) ] as $roots
+    | { count: ($orph|length),
+        summb: sz([ $orph[] | ($byid[.]."diff-size"//0|tonumber) ] | add // 0),
+        root: ($roots | if length>0 then (sort_by($byid[.].created)|.[0]) else null end) }
+  ' "${OVERLAY_LAYERS_FILE}")
+  ORPHAN_COUNT=$(echo "${ORPHAN_INFO}" | jq -r '.count' 2>${STD_ERR}); ORPHAN_COUNT=${ORPHAN_COUNT:-0}
+  ORPHAN_ROOT=$(echo "${ORPHAN_INFO}" | jq -r '.root // ""' 2>${STD_ERR})
+  ORPHAN_SUMMB=$(echo "${ORPHAN_INFO}" | jq -r '.summb' 2>${STD_ERR})
+
+  NORPH=0; [[ ${ORPHAN_COUNT} -gt 0 ]] && NORPH=1
+  M=$((NIMG + NORPH))
+
+  echo -e "\n${purpletext}--- Trees including this layer (${M}) ---${resetcolor}"
+
+  # Overview table: one row per present image and one row for the orphaned branch.
+  # Image/root IDs are shown in full so they can be reused with other options
+  # (e.g. -m for an image, -o for a layer). See STORAGE_LAYERS.md for how to prune.
+  TREE_ROWS="Tree|Type|ID|Details"
+  if [[ ${NIMG} -gt 0 ]]
+  then
+    TREE_ROWS="${TREE_ROWS}
+$(echo "${IMG_TREES_JSON}" | jq -r --argjson m "${M}" \
+      'to_entries[] | "\(.key+1)/\($m)|Image|\(.value.image)|\(.value.tag) (layer \(.value.pos)/\(.value.total)\(if .value.top then ", top" else "" end))"')"
+  fi
+  if [[ ${NORPH} -gt 0 ]]
+  then
+    TREE_ROWS="${TREE_ROWS}
+$((NIMG+1))/${M}|Orphan branch|${ORPHAN_ROOT}|${ORPHAN_COUNT} layer(s), ${ORPHAN_SUMMB}"
+  fi
+  echo -e "${TREE_ROWS}" | column -ts'|' | sed -e 's/[ \t]*$//'
+
+  # The orphaned branch detailed layer listing (the in-use base, if any, is kept for
+  # context and shown as IN-USE).
+  if [[ ${NORPH} -gt 0 ]]
+  then
+    CHAIN_DETAIL=$(jq -r \
+      --arg id "${OVERLAY}" \
+      --argjson imgidx "${IMG_INDEX}" '
+      def sz($b): if ($b == null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+      . as $L
+      | ($L | map({key:.id,value:.}) | from_entries) as $byid
+      | ($L | map(select(.parent!=null and .parent!="")) | group_by(.parent)
+           | map({key:.[0].parent, value: map(.id)}) | from_entries) as $ch
+      | ([ $imgidx[].digest ]) as $imgdigs
+      | [ $id | recurse($byid[.].parent | select(.!=null and .!="")) ] as $anc
+      | [ $id | recurse($ch[.][]?) ] as $desc
+      # Keep the target and the orphaned descendants only (drop the valid image branches),
+      # then append the ancestors (parent -> base) for context.
+      | (($desc | reverse) | map(. as $lid | select( ($lid == $id) or (($imgdigs | index($byid[$lid]."diff-digest")) | not) ))) as $desc_show
+      | ($desc_show + ($anc[1:])) as $ordered
+      | "Type|Layer ID|Layer size (diff)|Created",
+        ( $ordered[] | . as $lid | $byid[$lid] as $ly
+          | (if ($imgdigs | index($ly."diff-digest")) then "IN-USE" else "ORPHAN" end) as $mark
+          | "\($mark)|\($lid)|\(sz($ly."diff-size"))|\($ly.created // "-")" )
+    ' "${OVERLAY_LAYERS_FILE}")
+
+    echo -e "\n${purpletext}--- Orphan branch detail (Tree $((NIMG+1))/${M}, root ${ORPHAN_ROOT:0:13}) ---${resetcolor}"
+    echo -e "(${redtext}ORPHAN${resetcolor} = not used by any present image | ${greentext}IN-USE${resetcolor} = shared base, kept for context | overlay from -o in ${yellowtext}yellow${resetcolor})"
+    echo -e "${CHAIN_DETAIL}" | column -ts'|' | sed \
+      -e 's/[ \t]*$//' \
+      -e "s/^ORPHAN/${redtext}ORPHAN${resetcolor}/" \
+      -e "s/^IN-USE/${greentext}IN-USE${resetcolor}/" \
+      -e "s/${OVERLAY}/${yellowtext}${OVERLAY}${resetcolor}/"
+  fi
+  echo ""
+}
+
+# Search every orphaned/dangling layer in the sosreport, group them per tree (connected
+# orphan layers sharing the same top-most orphan ancestor) and summarise each tree with
+# its bottom/top layer, the number of orphaned layers and their total diff-size.
+# Triggered with: -o orphan (or -o orphans).
+fct_overlay_orphans(){
+  OVERLAY_LAYERS_FILE=${SOSREPORT_PATH}/var/lib/containers/storage/overlay-layers/layers.json
+  IMAGEPATH=${IMAGEPATH:-$(dirname $(find ${CRIO_PATH}/ -name "crictl_inspecti_*" 2>${STD_ERR} | head -1) 2>${STD_ERR})}
+
+  if [[ ! -f ${OVERLAY_LAYERS_FILE} ]]
+  then
+    echo -e "${yellowtext}WARN: The layers file required to search for orphaned layers is missing:\n  <SOSREPORT_PATH>/var/lib/containers/storage/overlay-layers/layers.json${resetcolor}"
+    echo -e "Please collect it and add it to the sosreport. See STORAGE_LAYERS.md for details.\n"
+    return 1
+  fi
+
+  # Set of layer digests referenced by present images (via crictl_inspecti_* diff_ids).
+  IMG_DIGESTS="[]"
+  if [[ -n ${IMAGEPATH} ]]
+  then
+    IMG_DIGESTS=$(jq -s '[ .[] | .info.imageSpec.rootfs.diff_ids[]? ] | unique' \
+        $(file ${IMAGEPATH}/crictl_inspecti_* 2>${STD_ERR} | grep -E "JSON data" | cut -d':' -f1) 2>${STD_ERR})
+  fi
+  [[ -z ${IMG_DIGESTS} ]] && IMG_DIGESTS="[]"
+
+  # An orphan layer is one with a diff-digest that is not referenced by any present image.
+  # Orphans are grouped by their top-most orphan ancestor (the parent relation is a forest).
+  ORPHAN_TREES=$(jq -c --argjson set "${IMG_DIGESTS}" '
+    . as $L
+    | ($L | map({key:.id,value:.}) | from_entries) as $byid
+    | ([ $L[] | . as $l | select((($l."diff-digest"//"")!="") and (($set|index($l."diff-digest"))|not)) ]) as $orph
+    | ($orph | map(.id) | reduce .[] as $x ({}; .[$x]=true)) as $oset
+    | ($orph | map(.parent) | reduce .[] as $x ({}; .[$x]=true)) as $pset
+    | def root($s): $s | until( ($oset[ $byid[.].parent // "" ] // false) | not ; $byid[.].parent // "" );
+      ( $orph | group_by( root(.id) ) )
+      | map( . as $g
+          | ($g | map(select( ($oset[ $byid[.id].parent // "" ] // false) | not )) | .[0]) as $bottom
+          | ($g | map(select( ($pset[.id] // false) | not )) | sort_by(.created) | last) as $top
+          | { count: ($g|length),
+              sum: ([ $g[] | (."diff-size"//0|tonumber) ] | add),
+              bottom: {id:$bottom.id, size:$bottom."diff-size", created:$bottom.created},
+              top: {id:$top.id, size:$top."diff-size", created:$top.created} } )
+      | sort_by(-.sum)
+  ' "${OVERLAY_LAYERS_FILE}")
+  COUNT=$(echo "${ORPHAN_TREES}" | jq 'length' 2>${STD_ERR})
+
+  echo -e "${cyantext}Orphaned layer trees found in the sosreport${resetcolor}\n"
+  if [[ ${IMG_DIGESTS} == "[]" ]]
+  then
+    echo -e "${yellowtext}INFO: No image inspect data (crictl_inspecti_*) found - orphaned layers cannot be reliably distinguished from image layers.${resetcolor}\n"
+  fi
+  if [[ -z ${COUNT} ]] || [[ ${COUNT} == "0" ]]
+  then
+    echo -e "${greentext}No orphaned layer found: every layer is referenced by a present image.${resetcolor}\n"
+    return 0
+  fi
+
+  N=0
+  echo "${ORPHAN_TREES}" | jq -c '.[]' | while IFS= read -r g
+  do
+    N=$((N+1))
+    echo -e "${purpletext}=== Orphan tree #${N} (root $(echo "${g}" | jq -r '.bottom.id')) ===${resetcolor}"
+    echo "${g}" | jq -r '
+      def sz($b): if ($b==null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+      "Type|Layer ID|Layer size (diff)|Created",
+      "BOTTOM|\(.bottom.id)|\(sz(.bottom.size))|\(.bottom.created // "-")",
+      "TOP|\(.top.id)|\(sz(.top.size))|\(.top.created // "-")" ' \
+      | column -ts'|' | sed -e 's/[ \t]*$//' \
+        -e "s/^\(BOTTOM .*\)$/${redtext}\1${resetcolor}/" \
+        -e "s/^\(TOP .*\)$/${redtext}\1${resetcolor}/"
+    echo "${g}" | jq -r '
+      def sz($b): if ($b==null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+      "Orphaned layers in this tree:|\(.count) layer(s)",
+      "Sum of orphaned layer diff-sizes:|\(sz(.sum)) (uncompressed; actual on-disk footprint may differ)" ' \
+      | column -ts'|' | sed -e 's/[ \t]*$//' \
+        -e "s/\([0-9]\{4,10\}\.[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" \
+        -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g"
+    echo ""
+  done
+
+  echo -e "${cyantext}--- Totals ---${resetcolor}"
+  echo "${ORPHAN_TREES}" | jq -r '
+    def sz($b): if ($b==null) then "Unknown" else (($b|tonumber)/1024/1024*100|round/100|tostring)+" MB" end;
+    "Orphan trees:|\(length)",
+    "Total orphaned layers:|\([ .[].count ] | add) layer(s)",
+    "Total orphaned diff-size:|\(sz([ .[].sum ] | add)) (uncompressed; actual on-disk footprint may differ)" ' \
+    | column -ts'|' | sed -e 's/[ \t]*$//' \
+      -e "s/\([0-9]\{4,10\}\.[0-9]*\) MB/${redtext}\1${resetcolor} MB/g" \
+      -e "s/\([4-9][0-9]\{2\}\.[0-9]*\) MB/${yellowtext}\1${resetcolor} MB/g"
+  echo ""
+}
+
 ##### Main
 
 # Set a default STD_ERR, which can be replaced for debugging to "/dev/stderr"
@@ -752,6 +1023,12 @@ else
       fi
       ;;
     "OVERLAY")
+      # Keyword search: list all orphaned/dangling layer trees instead of a single overlay.
+      if [[ "$(echo ${OVERLAY} | tr '[:upper:]' '[:lower:]')" == "orphan" ]] || [[ "$(echo ${OVERLAY} | tr '[:upper:]' '[:lower:]')" == "orphans" ]]
+      then
+        fct_overlay_orphans
+        exit 0
+      fi
       if [[ ! -d ${PODPATH} ]]
       then
         echo -e "${redtext}ERR: The <$PODPATH> does not exist and is required for this option\nPlease check the content of the sosreport${resetcolor}\n" && fct_help && exit 9
@@ -760,7 +1037,17 @@ else
       if [[ -z ${POD_IDS_LIST} ]]
       then
         CONTAINERID=$(jq -r --arg overlay "$(echo ${OVERLAY} | sed -e "s/crio-//")" '.? | select(.info.runtimeSpec.root.path | test($overlay)) | "\(.status.id[0:13])"' $(file ${CONTAINERPATH}/crictl_inspect* | grep -E "JSON data" | cut -d':' -f1) 2>/dev/null)
-        fct_extract_from_container_id
+        if [[ ! -z ${CONTAINERID} ]]
+        then
+          fct_extract_from_container_id
+        fi
+      fi
+      # No running POD/container owns this overlay: classify it as a storage layer
+      # (image layer, orphaned/dangling layer, ...) and display the available details.
+      if [[ -z ${POD_IDS_LIST} ]]
+      then
+        fct_overlay_classify
+        exit 0
       fi
       echo -e "List of PODs including the overlay: ${OVERLAY}\n"
       ;;

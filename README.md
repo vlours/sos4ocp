@@ -123,3 +123,18 @@ It's also possible to use the `-m` option to display the image layers for a sing
 
 _Note: The file `/var/lib/containers/storage/overlay-layers/layers.json` will be included in the SOSREPORT plugins after the PR `#4284` will be merged.
 It's possible to request the customer to collect the file and then include it in the SOSREPORT archive in the folder `<sosreport>//var/lib/containers/storage/overlay-layers/`_
+
+> **Additional information:** For details on how containers and images are composed of
+> overlays, what is stored in each `/var/lib/containers/storage/` folder, and how to
+> correlate the layers together, see [**STORAGE_LAYERS.md**](STORAGE_LAYERS.md).
+
+#### Overlay classification
+
+* from version 1.5.0, the `-o <OVERLAY_ID>` option no longer stops when an overlay does
+  not match a running POD or container. Instead, it classifies the overlay as a storage
+  layer and reports whether it is a container writable layer, an image top/intermediate
+  (shared) layer, or an **orphaned/dangling layer** (typically a leftover from a removed
+  image — a common `diskPressure` culprit), along with the available layer details
+  (parent, children, `diff-digest`, `diff-size`, owning/sharing images, reclaimable space).
+
+See [**STORAGE_LAYERS.md**](STORAGE_LAYERS.md) for how the classification is performed.
